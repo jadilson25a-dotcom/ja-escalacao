@@ -5,7 +5,7 @@ import struct, hashlib, zlib, zipfile, io, os, sys, datetime
 PKG = 'com.jadilson.escalacao'
 CLS = 'L' + PKG.replace('.', '/') + '/MainActivity;'
 APP_LABEL = 'JA Escalação'
-VERSION_CODE, VERSION_NAME = 2, '1.1'
+VERSION_CODE, VERSION_NAME = 3, '1.2'
 MIN_SDK, TARGET_SDK = 24, 34
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -83,15 +83,40 @@ def iput_obj(a, b, f):    return [(b << 12) | (a << 8) | 0x5b, f]
 def iget_obj(a, b, f):    return [(b << 12) | (a << 8) | 0x54, f]
 def if_eqz(a, off):       return [(a << 8) | 0x38, off & 0xFFFF]
 
+def inv_static(regs, m):  return invoke(0x71, regs, m)
+def inv_iface(regs, m):   return invoke(0x72, regs, m)
+def ret(a):               return [(a << 8) | 0x0f]
+
+def assemble(items):
+    """items: lists of words, ('L', name) labels, or ('if-eqz', reg, label)."""
+    pos, labels = 0, {}
+    for it in items:
+        if isinstance(it, tuple) and it[0] == 'L': labels[it[1]] = pos
+        elif isinstance(it, tuple): pos += 2
+        else: pos += len(it)
+    out, pos = [], 0
+    for it in items:
+        if isinstance(it, tuple) and it[0] == 'L': continue
+        if isinstance(it, tuple):
+            _, reg, lab = it; w = if_eqz(reg, labels[lab] - pos)
+        else: w = it
+        out += w; pos += len(w)
+    return out
+
 def build_dex():
     d = DexBuilder()
+    CC = 'L' + PKG.replace('.', '/') + '/ChromeClient;'
     ACT, BUNDLE, WV = 'Landroid/app/Activity;', 'Landroid/os/Bundle;', 'Landroid/webkit/WebView;'
     WS, WIN, CTX, VIEW = 'Landroid/webkit/WebSettings;', 'Landroid/view/Window;', 'Landroid/content/Context;', 'Landroid/view/View;'
     WVC, WCC, STR = 'Landroid/webkit/WebViewClient;', 'Landroid/webkit/WebChromeClient;', 'Ljava/lang/String;'
-    d.T(CLS); d.T(ACT)
+    VC, FCP, INTENT = 'Landroid/webkit/ValueCallback;', 'Landroid/webkit/WebChromeClient$FileChooserParams;', 'Landroid/content/Intent;'
+    URIS, OBJ = '[Landroid/net/Uri;', 'Ljava/lang/Object;'
+    d.T(CLS); d.T(ACT); d.T(CC); d.T(WCC)
     m_act_init = d.M(ACT, '<init>', 'V', [])
     m_act_oncreate = d.M(ACT, 'onCreate', 'V', [BUNDLE])
     m_act_back = d.M(ACT, 'onBackPressed', 'V', [])
+    m_act_result = d.M(ACT, 'onActivityResult', 'V', ['I', 'I', INTENT])
+    m_start = d.M(ACT, 'startActivityForResult', 'V', [INTENT, 'I'])
     m_getwin = d.M(ACT, 'getWindow', WIN, [])
     m_setcv = d.M(ACT, 'setContentView', 'V', [VIEW])
     m_sbc = d.M(WIN, 'setStatusBarColor', 'V', ['I'])
@@ -102,6 +127,7 @@ def build_dex():
     m_js = d.M(WS, 'setJavaScriptEnabled', 'V', ['Z'])
     m_dom = d.M(WS, 'setDomStorageEnabled', 'V', ['Z'])
     m_file = d.M(WS, 'setAllowFileAccess', 'V', ['Z'])
+    m_univ = d.M(WS, 'setAllowUniversalAccessFromFileURLs', 'V', ['Z'])
     m_wcc_init = d.M(WCC, '<init>', 'V', [])
     m_setwcc = d.M(WV, 'setWebChromeClient', 'V', [WCC])
     m_wvc_init = d.M(WVC, '<init>', 'V', [])
@@ -109,19 +135,26 @@ def build_dex():
     m_load = d.M(WV, 'loadUrl', 'V', [STR])
     m_cangoback = d.M(WV, 'canGoBack', 'Z', [])
     m_goback = d.M(WV, 'goBack', 'V', [])
+    m_onrecv = d.M(VC, 'onReceiveValue', 'V', [OBJ])
+    m_parse = d.M(FCP, 'parseResult', URIS, ['I', INTENT])
+    m_cintent = d.M(FCP, 'createIntent', INTENT, [])
     s_url = d.S('file:///android_asset/index.html')
     f_wv = d.F(CLS, 'wv', WV)
+    f_cb = d.F(CLS, 'cb', VC)
+    f_act = d.F(CC, 'act', CLS)
     my_init = d.M(CLS, '<init>', 'V', [])
     my_oncreate = d.M(CLS, 'onCreate', 'V', [BUNDLE])
     my_back = d.M(CLS, 'onBackPressed', 'V', [])
-    t_wv, t_wcc, t_wvc = d.T(WV), d.T(WCC), d.T(WVC)
+    my_result = d.M(CLS, 'onActivityResult', 'V', ['I', 'I', INTENT])
+    cc_init = d.M(CC, '<init>', 'V', [CLS])
+    cc_show = d.M(CC, 'onShowFileChooser', 'Z', [WV, VC, FCP])
+    t_wv, t_cc, t_wvc = d.T(WV), d.T(CC), d.T(WVC)
     d.finalize()
     I = d.idx
 
-    # <init>: regs=1 (p0=v0)
+    # ---- MainActivity ----
     code_init = (1, 1, 1, inv_direct([0], I(m_act_init)) + ret_void())
-    # onCreate: regs=5 (v0..v2, p0=v3, p1=v4)
-    c = []
+    c = []   # regs 5: v0..v2, p0=v3, p1=v4
     c += inv_super([3, 4], I(m_act_oncreate))
     c += inv_virtual([3], I(m_getwin)); c += move_res_obj(0)
     c += const32(1, 0xFF0E2A1B); c += inv_virtual([0, 1], I(m_sbc))
@@ -131,55 +164,67 @@ def build_dex():
     c += const32(1, 0xFF07140D); c += inv_virtual([0, 1], I(m_bg))
     c += inv_virtual([0], I(m_gs)); c += move_res_obj(1)
     c += const4(2, 1)
-    c += inv_virtual([1, 2], I(m_js)); c += inv_virtual([1, 2], I(m_dom)); c += inv_virtual([1, 2], I(m_file))
-    c += new_inst(1, I(t_wcc)); c += inv_direct([1], I(m_wcc_init)); c += inv_virtual([0, 1], I(m_setwcc))
+    for m in (m_js, m_dom, m_file, m_univ): c += inv_virtual([1, 2], I(m))
+    c += new_inst(1, I(t_cc)); c += inv_direct([1, 3], I(cc_init)); c += inv_virtual([0, 1], I(m_setwcc))
     c += new_inst(1, I(t_wvc)); c += inv_direct([1], I(m_wvc_init)); c += inv_virtual([0, 1], I(m_setwvc))
     c += const_str(1, I(s_url)); c += inv_virtual([0, 1], I(m_load))
     c += inv_virtual([3, 0], I(m_setcv))
     c += ret_void()
     code_oncreate = (5, 2, 2, c)
-    # onBackPressed: regs=3 (v0,v1, p0=v2)
-    b = []
-    b += iget_obj(0, 2, I(f_wv))            # 0..1
-    b += if_eqz(0, 12)                       # 2..3  -> 14
-    b += inv_virtual([0], I(m_cangoback))   # 4..6
-    b += move_res(1)                         # 7
-    b += if_eqz(1, 6)                        # 8..9  -> 14
-    b += inv_virtual([0], I(m_goback))      # 10..12
-    b += ret_void()                          # 13
-    b += inv_super([2], I(m_act_back))      # 14..16
-    b += ret_void()                          # 17
-    assert len(b) == 18
-    code_back = (3, 1, 1, b)
+    code_back = (3, 1, 1, assemble([   # v0,v1, p0=v2
+        iget_obj(0, 2, I(f_wv)), ('if-eqz', 0, 'sup'),
+        inv_virtual([0], I(m_cangoback)), move_res(1), ('if-eqz', 1, 'sup'),
+        inv_virtual([0], I(m_goback)), ret_void(),
+        ('L', 'sup'), inv_super([2], I(m_act_back)), ret_void()]))
+    code_result = (6, 4, 4, assemble([  # v0,v1, p0=v2, p1=v3 req, p2=v4 res, p3=v5 data
+        inv_super([2, 3, 4, 5], I(m_act_result)),
+        iget_obj(0, 2, I(f_cb)), ('if-eqz', 0, 'end'),
+        inv_static([4, 5], I(m_parse)), move_res_obj(1),
+        inv_iface([0, 1], I(m_onrecv)),
+        const4(1, 0), iput_obj(1, 2, I(f_cb)),
+        ('L', 'end'), ret_void()]))
+    # ---- ChromeClient ----
+    code_cc_init = (2, 2, 1, inv_direct([0], I(m_wcc_init)) + iput_obj(1, 0, I(f_act)) + ret_void())
+    code_cc_show = (6, 4, 3, assemble([  # v0,v1, p0=v2, p1=v3 wv, p2=v4 cb, p3=v5 params
+        iget_obj(0, 2, I(f_act)), iget_obj(1, 0, I(f_cb)), ('if-eqz', 1, 'novo'),
+        const4(3, 0), inv_iface([1, 3], I(m_onrecv)),
+        ('L', 'novo'), iput_obj(4, 0, I(f_cb)),
+        inv_virtual([5], I(m_cintent)), move_res_obj(1),
+        const4(3, 1), inv_virtual([0, 1, 3], I(m_start)),
+        const4(1, 1), ret(1)]))
 
-    direct = [(I(my_init), 0x10001, code_init)]                     # public constructor
-    virtual = sorted([(I(my_oncreate), 0x4, code_oncreate), (I(my_back), 0x1, code_back)])
-    inst_fields = [(I(f_wv), 0x2)]                                  # private
+    classes = [
+        dict(cls=CLS, sup=ACT, fields=[(I(f_cb), 0x1), (I(f_wv), 0x2)],
+             direct=[(I(my_init), 0x10001, code_init)],
+             virtual=[(I(my_oncreate), 0x4, code_oncreate), (I(my_back), 0x1, code_back), (I(my_result), 0x4, code_result)]),
+        dict(cls=CC, sup=WCC, fields=[(I(f_act), 0x12)],   # private final
+             direct=[(I(cc_init), 0x10001, code_cc_init)],
+             virtual=[(I(cc_show), 0x1, code_cc_show)]),
+    ]
+    for k in classes:
+        k['fields'].sort(); k['direct'].sort(); k['virtual'].sort()
 
-    # ---------- layout ----------
     n_s, n_t, n_p, n_f, n_m = len(d.str_list), len(d.type_list), len(d.proto_list), len(d.field_list), len(d.method_list)
+    n_c = len(classes)
     off = 0x70
     string_ids_off = off; off += 4 * n_s
     type_ids_off = off; off += 4 * n_t
     proto_ids_off = off; off += 12 * n_p
     field_ids_off = off; off += 8 * n_f
     method_ids_off = off; off += 8 * n_m
-    class_defs_off = off; off += 32
+    class_defs_off = off; off += 32 * n_c
     data_off = off
-
     data = bytearray()
     def here(): return data_off + len(data)
-    # code items
-    align(data, 4)
     code_offs = {}
     code_items_off = here()
-    for midx, _, (regs, ins, outs, insns) in direct + virtual:
-        align(data, 4)
-        code_offs[midx] = here()
-        data += u16(regs) + u16(ins) + u16(outs) + u16(0) + u32(0) + u32(len(insns))
-        for w in insns: data += u16(w)
+    for k in classes:
+        for midx, _, (regs, ins, outs, insns) in k['direct'] + k['virtual']:
+            align(data, 4)
+            code_offs[midx] = here()
+            data += u16(regs) + u16(ins) + u16(outs) + u16(0) + u32(0) + u32(len(insns))
+            for w in insns: data += u16(w)
     n_code = len(code_offs)
-    # type lists
     align(data, 4)
     tl_off = {}
     type_lists_off = here()
@@ -191,56 +236,54 @@ def build_dex():
             data += u32(len(params)) + b''.join(u16(d.ti[x]) for x in params)
             align(data, 4)
     n_tl = len(tl_off)
-    # string data
     str_data_off = here(); s_off = []
     for s in d.str_list:
         s_off.append(here())
-        enc = s.encode('utf-8')  # todas ASCII aqui (MUTF-8 == UTF-8)
+        enc = s.encode('utf-8')
         assert all(ch < 0x80 for ch in enc) and '\0' not in s
         data += uleb(len(s)) + enc + b'\0'
-    # class data
+    class_data_offs = []
     class_data_off = here()
-    data += uleb(0) + uleb(len(inst_fields)) + uleb(len(direct)) + uleb(len(virtual))
-    prev = 0
-    for fidx, acc in inst_fields:
-        data += uleb(fidx - prev) + uleb(acc); prev = fidx
-    for group in (direct, virtual):
+    for k in classes:
+        class_data_offs.append(here())
+        data += uleb(0) + uleb(len(k['fields'])) + uleb(len(k['direct'])) + uleb(len(k['virtual']))
         prev = 0
-        for midx, acc, _ in group:
-            data += uleb(midx - prev) + uleb(acc) + uleb(code_offs[midx]); prev = midx
-    # map list
+        for fidx, acc in k['fields']:
+            data += uleb(fidx - prev) + uleb(acc); prev = fidx
+        for group in (k['direct'], k['virtual']):
+            prev = 0
+            for midx, acc, _ in group:
+                data += uleb(midx - prev) + uleb(acc) + uleb(code_offs[midx]); prev = midx
     align(data, 4)
     map_off = here()
     items = [(0x0000, 1, 0), (0x0001, n_s, string_ids_off), (0x0002, n_t, type_ids_off), (0x0003, n_p, proto_ids_off),
-             (0x0004, n_f, field_ids_off), (0x0005, n_m, method_ids_off), (0x0006, 1, class_defs_off),
+             (0x0004, n_f, field_ids_off), (0x0005, n_m, method_ids_off), (0x0006, n_c, class_defs_off),
              (0x2001, n_code, code_items_off)]
     if n_tl: items.append((0x1001, n_tl, type_lists_off))
-    items += [(0x2002, n_s, str_data_off), (0x2000, 1, class_data_off), (0x1000, 1, map_off)]
+    items += [(0x2002, n_s, str_data_off), (0x2000, n_c, class_data_off), (0x1000, 1, map_off)]
     items.sort(key=lambda x: x[2])
     data += u32(len(items)) + b''.join(u16(t) + u16(0) + u32(n) + u32(o) for t, n, o in items)
-
-    # ---------- ids ----------
     ids = bytearray()
     for o in s_off: ids += u32(o)
     for t in d.type_list: ids += u32(d.si[t])
-    for p in d.proto_list:
-        ids += u32(d.si[p[0]]) + u32(d.ti[p[1]]) + u32(tl_off.get(p[2], 0) if p[2] else 0)
+    for p in d.proto_list: ids += u32(d.si[p[0]]) + u32(d.ti[p[1]]) + u32(tl_off.get(p[2], 0) if p[2] else 0)
     for f in d.field_list: ids += u16(d.ti[f[0]]) + u16(d.ti[f[2]]) + u32(d.si[f[1]])
     for m in d.method_list: ids += u16(d.ti[m[0]]) + u16(d.pi[m[2]]) + u32(d.si[m[1]])
-    ids += u32(d.ti[CLS]) + u32(0x1) + u32(d.ti[ACT]) + u32(0) + u32(0xFFFFFFFF) + u32(0) + u32(class_data_off) + u32(0)
+    for k, cdo in zip(classes, class_data_offs):
+        ids += u32(d.ti[k['cls']]) + u32(0x1) + u32(d.ti[k['sup']]) + u32(0) + u32(0xFFFFFFFF) + u32(0) + u32(cdo) + u32(0)
     assert 0x70 + len(ids) == data_off
-
     file_size = data_off + len(data)
-    hdr = bytearray(b'dex\n035\0') + b'\0' * 4 + b'\0' * 20
+    hdr = bytearray(b'dex\n035\0') + b'\0' * 24
     hdr += u32(file_size) + u32(0x70) + u32(0x12345678) + u32(0) + u32(0) + u32(map_off)
     hdr += u32(n_s) + u32(string_ids_off) + u32(n_t) + u32(type_ids_off) + u32(n_p) + u32(proto_ids_off)
-    hdr += u32(n_f) + u32(field_ids_off) + u32(n_m) + u32(method_ids_off) + u32(1) + u32(class_defs_off)
+    hdr += u32(n_f) + u32(field_ids_off) + u32(n_m) + u32(method_ids_off) + u32(n_c) + u32(class_defs_off)
     hdr += u32(len(data)) + u32(data_off)
     assert len(hdr) == 0x70
     dex = bytearray(hdr + ids + data)
     dex[12:32] = hashlib.sha1(dex[32:]).digest()
     dex[8:12] = u32(zlib.adler32(bytes(dex[12:])))
     return bytes(dex)
+
 
 # =====================================================================
 # String pool (UTF-16) usado no XML binário e no resources.arsc
@@ -275,6 +318,7 @@ def build_manifest(icon_id):
     A = lambda n, t, v: (n, True, t, v)
     tree = ('manifest', [A('versionCode', T_DEC, VERSION_CODE), A('versionName', T_STR, VERSION_NAME), ('package', False, T_STR, PKG)], [
         ('uses-sdk', [A('minSdkVersion', T_DEC, MIN_SDK), A('targetSdkVersion', T_DEC, TARGET_SDK)], []),
+        ('uses-permission', [A('name', T_STR, 'android.permission.INTERNET')], []),
         ('application', [A('theme', T_REF, 0x0103022e), A('label', T_STR, APP_LABEL), A('icon', T_REF, icon_id),
                          A('allowBackup', T_BOOL, True), A('hardwareAccelerated', T_BOOL, True)], [
             ('activity', [A('name', T_STR, PKG + '.MainActivity'), A('exported', T_BOOL, True),

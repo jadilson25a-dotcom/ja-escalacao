@@ -20,6 +20,8 @@ header{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;backgroun
 header h1{font-size:18px;margin:0;line-height:1.1}
 header small{color:var(--mut);font-size:12px}
 header .sp{flex:1}
+header>div:nth-child(2){min-width:0}
+header h1,header small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ib{background:var(--card);border:1px solid var(--line);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;font-size:18px}
 main{flex:1;overflow-y:auto;padding:0 12px 90px}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0a1d13;border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:20}
@@ -55,7 +57,12 @@ nav button.on{color:var(--acc);background:rgba(61,220,132,.09)}
 .bench .b{flex:none;display:flex;flex-direction:column;align-items:center;width:62px}
 .bench .shirt{width:38px;height:38px;font-size:14px}
 .bench .tname{font-size:10.5px;max-width:62px}
-.hsh{display:flex;flex:none}.hsh .s2{margin-left:-10px}
+.hsh{display:flex;flex:none}
+.ava{border-radius:50%;border:3px solid;display:grid;place-items:center;font-weight:800;background-size:cover;background-position:center;flex:none;box-sizing:border-box}
+.shirt.photo{background-size:cover;background-position:center;border-width:3px}
+.nbadge{position:absolute;bottom:-5px;right:-9px;font-size:9.5px;font-weight:800;min-width:17px;height:17px;padding:0 4px;border-radius:9px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.75)}
+.banner{background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.35);color:#ffd27a;border-radius:14px;padding:10px 12px;margin:10px 0;font-size:13.5px}
+.banner.ok{background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.3);color:#bff3d4}.hsh .s2{margin-left:-10px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid rgba(255,255,255,.6)}
 .tlabel{position:absolute;left:8px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:8px;z-index:1;opacity:.92;max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tlabel.top{top:calc(50% - 22px)}.tlabel.bot{top:calc(50% + 6px)}
@@ -140,6 +147,7 @@ label.f{display:block;font-size:12.5px;color:var(--mut);margin:10px 0 4px;font-w
   <div id="hShields" class="hsh"></div>
   <div><h1 id="hName">Meu Time</h1><small id="hSub">Campo · 4-3-3</small></div>
   <div class="sp"></div>
+  <button class="ib" onclick="pull(true,true)" aria-label="Atualizar">🔄</button>
   <button class="ib" onclick="openConfig()" aria-label="Configurações">⚙️</button>
 </header>
 <main id="main"></main>
@@ -190,22 +198,19 @@ function slotsFor(t){
 }
 
 /* ================== ESTADO ================== */
-const KEY = 'ja-escalacao-v2', OLDKEY = 'ja-escalacao-v1';
+const REPO = 'jadilson25a-dotcom/ja-escalacao', DPATH = 'dados/escalacao.json';
+const API = 'https://api.github.com/repos/'+REPO+'/contents/'+DPATH, RAW = 'https://raw.githubusercontent.com/'+REPO+'/main/'+DPATH;
+const KEY = 'ja-escalacao-v3', OLDKEYS = ['ja-escalacao-v2','ja-escalacao-v1'];
 let S;
+let TOKEN = ''; try{ TOKEN = localStorage.getItem('ja-admin-token')||''; }catch(e){}
+let ADMIN = !!TOKEN;
+let PV = {gols:true, pos:true, banco:true}; try{ Object.assign(PV, JSON.parse(localStorage.getItem('ja-pv')||'{}')); }catch(e){}
+function savePV(){ try{ localStorage.setItem('ja-pv', JSON.stringify(PV)); }catch(e){} }
 const uid = () => Math.random().toString(36).slice(2,9);
 function base(){
   return {times:[{nome:'Time A', cor:'#e11d48', gk:'#eab308', form:'2-2-1', esc:[]},
                  {nome:'Time B', cor:'#2563eb', gk:'#16a34a', form:'2-2-1', esc:[]}],
-          jog:[], banco:[], partidas:[], pv:{gols:true, pos:true, banco:true}};
-}
-function seed(){
-  const s = base();
-  const lista = [['Rogério','GOL',1,0],['Fernando','FIX',3,1],['Thiago','ALA',7,4],['Lucas','ALA',8,3],['Gabriel','PIV',9,7],['Bruno','MEI',10,5],
-                 ['Éder','GOL',12,0],['Danilo','FIX',4,2],['Rafael','ALA',11,6],['Pedro','ALA',6,2],['Vini','PIV',19,8],['Alex','ZAG',5,1],
-                 ['Marcos','ATA',17,3],['Caio','MEI',14,2]];
-  s.jog = lista.map(a=>({id:uid(), nome:a[0], pos:a[1], num:a[2], gols:a[3], assist:Math.max(0,a[3]-2), jogos:6}));
-  S = s; resetSlots(); fillAuto(); s.banco = s.jog.filter(j=>!onField(j.id)).map(j=>j.id);
-  return s;
+          jog:[], banco:[], partidas:[], rev:0, atualizado:0};
 }
 function migrate(o){
   const map = {LD:'ALA',LE:'ALA',VOL:'MEI',MC:'MEI',MEI:'MEI',PE:'ATA',PD:'ATA',SA:'ATA'};
@@ -213,23 +218,127 @@ function migrate(o){
   s.jog = (o.jog||[]).map(j=>Object.assign({}, j, {pos: POS[j.pos] ? j.pos : (map[j.pos]||'MEI')}));
   if(o.time){ s.times[0].nome = o.time.nome||'Time A'; s.times[0].cor = o.time.cor||s.times[0].cor; s.times[0].gk = o.time.gk||s.times[0].gk; }
   s.partidas = (o.partidas||[]).map(p=>({id:p.id, data:p.data, na:(o.time&&o.time.nome)||'Meu Time', nb:p.adv||'Adversário', ga:p.gp||0, gb:p.gc||0, marc:p.marc||[], jogos:p.jogos||[]}));
-  s.pv = Object.assign(s.pv, o.pv||{});
   S = s; resetSlots(); fillAuto(); s.banco = s.jog.filter(j=>!onField(j.id)).map(j=>j.id);
   return s;
 }
+function oldLocal(){
+  for(const k of OLDKEYS){ try{ const t = localStorage.getItem(k); if(t){ const o = JSON.parse(t); if(o && o.jog && o.jog.length) return o.times ? o : migrate(o); } }catch(e){} }
+  return null;
+}
 function load(){
-  try{
-    const t = localStorage.getItem(KEY);
-    if(t) S = JSON.parse(t);
-    else { const old = localStorage.getItem(OLDKEY); if(old){ S = migrate(JSON.parse(old)); save(); } }
-  }catch(e){ S = null; }
-  if(!S || !S.jog || !S.times) S = seed();
+  try{ const t = localStorage.getItem(KEY); if(t) S = JSON.parse(t); }catch(e){ S = null; }
+  if(!S || !S.jog || !S.times){ S = (ADMIN && oldLocal()) || base(); }
   fixEsc();
 }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function saveLocal(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ if(!ADMIN) return; S.rev = (S.rev||0)+1; S.atualizado = Date.now(); saveLocal(); schedulePublish(); }
+
+/* ================== SINCRONIZAÇÃO (GitHub) ================== */
+let SHA = null, syncSt = '', pubTimer = null, publishing = false, pollT = null, needRender = false;
+const b64 = t => btoa(unescape(encodeURIComponent(t)));
+const unb64 = t => decodeURIComponent(escape(atob((t||'').replace(/\s/g,''))));
+const hhmm = d => { const x = new Date(d); return String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0'); };
+function setSync(st){ syncSt = st; header(); }
+function syncTxt(){
+  const up = S.atualizado ? ' · '+hhmm(S.atualizado) : '';
+  return ({ok: ADMIN ? '✅ publicado'+up : '🟢 ao vivo'+up, pend:'✏️ salvando…', pub:'⏫ publicando…',
+    erro:'⚠️ não publicou — tentando de novo', offline:'⚪ sem conexão'+up, vazio: ADMIN ? 'publicando…' : '⏳ aguardando o administrador',
+    limite:'🟢 atualizado'+up, '':'conectando…'})[syncSt] || '';
+}
+async function pull(force, user){
+  if(ADMIN && (pubTimer || publishing)){ if(user) toast('Publicando suas alterações…'); return; }
+  const h = {'Accept':'application/vnd.github.raw+json'};
+  if(TOKEN) h.Authorization = 'Bearer '+TOKEN;
+  let et = ''; try{ et = localStorage.getItem('ja-etag')||''; }catch(e){}
+  if(et && !force) h['If-None-Match'] = et;
+  if(user) toast('Atualizando…');
+  try{
+    const r = await fetch(API+'?ref=main', {headers:h, cache:'no-store'});
+    if(r.status===304){ setSync('ok'); return; }
+    if(r.status===404){ if(ADMIN){ SHA = null; publishNow(); } else setSync('vazio'); return; }
+    let data, st = 'ok';
+    if(r.ok){ try{ localStorage.setItem('ja-etag', r.headers.get('ETag')||''); }catch(e){} data = await r.json(); }
+    else if(r.status===401 && ADMIN){ toast('Token inválido ou expirado — entre de novo como administrador'); throw 0; }
+    else { const r2 = await fetch(RAW+'?t='+Date.now(), {cache:'no-store'}); if(!r2.ok) throw 0; data = await r2.json(); st = 'limite'; }
+    applyRemote(data); setSync(st);
+  }catch(e){ setSync('offline'); }
+}
+function applyRemote(data){
+  if(!data || !data.times || !data.jog) return;
+  if(ADMIN && (pubTimer || publishing)) return;
+  const changed = JSON.stringify(data) !== JSON.stringify(S);
+  S = data; fixEsc(); saveLocal();
+  if(!changed) return;
+  if(sheet.classList.contains('open')) needRender = true; else render();
+}
+async function fetchSha(){
+  const r = await fetch(API+'?ref=main', {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+TOKEN}, cache:'no-store'});
+  if(r.status===404){ SHA = null; return null; }
+  if(!r.ok) throw r.status;
+  const j = await r.json(); SHA = j.sha; return j;
+}
+function schedulePublish(){ clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, 2500); setSync('pend'); }
+async function publishNow(){
+  clearTimeout(pubTimer); pubTimer = null;
+  if(!ADMIN) return;
+  if(publishing){ pubTimer = setTimeout(publishNow, 1000); return; }
+  publishing = true; setSync('pub');
+  const rev = S.rev;
+  try{
+    if(SHA===null) await fetchSha();
+    const put = () => { const body = {message:'Atualiza escalação ('+new Date().toLocaleString('pt-BR')+')', content:b64(JSON.stringify(S)), branch:'main'};
+      if(SHA) body.sha = SHA;
+      return fetch(API, {method:'PUT', headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}, body:JSON.stringify(body)}); };
+    let r = await put();
+    if(r.status===409 || r.status===422){ await fetchSha(); r = await put(); }
+    if(r.status===401 || r.status===403){ publishing = false; setSync('erro');
+      toast(r.status===401 ? 'Token inválido ou expirado — entre de novo como administrador' : 'Esse token não tem permissão de gravar (Contents: Read and write)'); return; }
+    if(!r.ok) throw r.status;
+    const j = await r.json(); SHA = j.content && j.content.sha;
+    try{ localStorage.removeItem('ja-etag'); }catch(e){}
+    publishing = false; setSync('ok');
+  }catch(e){ publishing = false; setSync('erro'); pubTimer = setTimeout(publishNow, 15000); return; }
+  if(S.rev !== rev && !pubTimer) schedulePublish();
+}
+function startPolling(){ clearInterval(pollT); pollT = setInterval(()=>{ if(document.visibilityState==='visible') pull(); }, ADMIN ? 90000 : 30000); }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') pull(); });
+
+function adminSheet(){
+  openSheet(`<div class="sh-h"><h2>👑 Modo administrador</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <p style="color:var(--mut);margin:0 0 6px;font-size:13.5px">Só quem tem a <b style="color:var(--txt)">chave de acesso</b> (token do GitHub) consegue editar. Quem não tem só acompanha a escalação, os gols e as partidas, que atualizam sozinhos.</p>
+  <label class="f">Token do GitHub</label><input class="inp" id="tok" type="password" placeholder="github_pat_…" autocomplete="off">
+  <button class="btn full" style="margin-top:12px" onclick="adminLogin()">Entrar como administrador</button>
+  <div class="card" style="font-size:12.5px;color:var(--mut);line-height:1.5"><b style="color:var(--txt)">Como criar o token (uma vez só):</b><br>
+  GitHub → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → <b>Generate new token</b><br>
+  • Repository access: <b>Only select repositories → ja-escalacao</b><br>• Permissions → <b>Contents: Read and write</b><br>• Generate, copie e cole aqui. Não passe esse token para ninguém.</div>`);
+}
+async function adminLogin(){
+  const t = document.getElementById('tok').value.trim(); if(!t){ toast('Cole o token'); return; }
+  toast('Verificando…');
+  try{
+    const r = await fetch('https://api.github.com/repos/'+REPO, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+t}, cache:'no-store'});
+    if(!r.ok){ toast(r.status===401 ? 'Token inválido' : 'Não consegui acessar o repositório ('+r.status+')'); return; }
+  }catch(e){ toast('Sem internet'); return; }
+  TOKEN = t; ADMIN = true; try{ localStorage.setItem('ja-admin-token', t); }catch(e){}
+  let j = null; try{ j = await fetchSha(); }catch(e){}
+  if(j){
+    let data = null; try{ data = JSON.parse(unb64(j.content)); }catch(e){}
+    if(!data){ try{ data = await (await fetch(RAW+'?t='+Date.now(), {cache:'no-store'})).json(); }catch(e){} }
+    if(data && data.times){ S = data; fixEsc(); saveLocal(); }
+  } else {
+    if(!S.jog.length){ const old = oldLocal(); if(old){ S = old; fixEsc(); } }
+    S.rev = (S.rev||0)+1; S.atualizado = Date.now(); saveLocal(); publishNow();
+  }
+  closeSheet(); startPolling(); render(); toast('👑 Pronto! Você é o administrador');
+}
+function adminLogout(){
+  ask('Sair do modo administrador? Neste celular você vai só acompanhar.', ()=>{
+    TOKEN = ''; ADMIN = false; clearTimeout(pubTimer); pubTimer = null; try{ localStorage.removeItem('ja-admin-token'); }catch(e){}
+    closeSheet(); startPolling(); render(); pull(true); }, 'Sair');
+}
 function resetSlots(){ [0,1].forEach(t=>{ const sl = slotsFor(t); const old = S.times[t].esc||[]; S.times[t].esc = sl.map((p,i)=>({pid: old[i]?old[i].pid:null, x:p.x, y:p.y})); }); }
 function fixEsc(){
-  S.pv = S.pv || {gols:true,pos:true,banco:true}; S.partidas = S.partidas||[]; S.banco = S.banco||[];
+  S.partidas = S.partidas||[]; S.banco = S.banco||[];
   const ids = new Set(S.jog.map(j=>j.id)); const seen = new Set();
   S.jog.forEach(j=>{ if(!POS[j.pos]) j.pos='MEI'; });
   [0,1].forEach(t=>{
@@ -261,7 +370,7 @@ function go(t){
 function header(){
   document.getElementById('hShields').innerHTML = shield(0) + shield(1,'s2');
   document.getElementById('hName').textContent = S.times[0].nome + ' x ' + S.times[1].nome;
-  document.getElementById('hSub').textContent = 'Futsal · 6 x 6 · ' + S.jog.length + ' jogadores';
+  document.getElementById('hSub').textContent = (ADMIN ? '👑 Admin · ' : '') + syncTxt();
 }
 function render(){
   header();
@@ -278,7 +387,7 @@ function openSheet(html){
   ov.style.display='block'; requestAnimationFrame(()=>sheet.classList.add('open'));
   if(!pushed){ try{ history.pushState({s:1},''); pushed=true; }catch(e){} }
 }
-function hideSheet(){ sheet.classList.remove('open'); ov.style.display='none'; }
+function hideSheet(){ sheet.classList.remove('open'); ov.style.display='none'; if(needRender){ needRender=false; render(); } }
 function closeSheet(){ hideSheet(); if(pushed){ pushed=false; try{ history.back(); }catch(e){} } }
 window.addEventListener('popstate', ()=>{ if(pushed){ pushed=false; hideSheet(); } else if(sheet.classList.contains('open')) hideSheet(); });
 function ask(msg, fn, ok){
@@ -294,12 +403,16 @@ const SVG_FIELD = `<svg viewBox="0 0 68 110" preserveAspectRatio="none" fill="no
 <path d="M17 108 A17 15 0 0 1 51 108"/><circle cx="34" cy="97" r=".6" fill="rgba(255,255,255,.85)"/><circle cx="34" cy="89" r=".6" fill="rgba(255,255,255,.85)"/>
 <rect x="29.5" y=".3" width="9" height="1.7" stroke-width=".35"/><rect x="29.5" y="108" width="9" height="1.7" stroke-width=".35"/></svg>`;
 
-function shirtStyle(j, t, slotPos){
-  const T = S.times[t>=0?t:0];
-  if(t<0) return `background:#475569;color:#fff`;
-  const gk = (j ? j.pos : slotPos)==='GOL' || slotPos==='GOL';
-  const bg = gk ? T.gk : T.cor;
-  return `background:${bg};color:${contrast(bg)}`;
+function teamBg(j, t, slotPos){
+  if(t<0) return '#475569';
+  const T = S.times[t]; const gk = (j ? j.pos : slotPos)==='GOL' || slotPos==='GOL';
+  return gk ? T.gk : T.cor;
+}
+function shirtStyle(j, t, slotPos){ const bg = teamBg(j,t,slotPos); return `background:${bg};color:${contrast(bg)}`; }
+function avatar(j, ring, size){
+  if(j && j.foto) return `<div class="ava" style="width:${size}px;height:${size}px;background-image:url(${j.foto});border-color:${ring}"></div>`;
+  const txt = j && j.num!=='' && j.num!=null ? j.num : initials(j ? j.nome : '');
+  return `<div class="ava" style="width:${size}px;height:${size}px;background:${ring};border-color:rgba(255,255,255,.25);color:${contrast(ring)};font-size:${Math.round(size*0.36)}px">${esc(txt)}</div>`;
 }
 function tokHTML(t, e, i, opts){
   const sl = slotsFor(t)[i]; const j = e.pid && J(e.pid);
@@ -307,7 +420,10 @@ function tokHTML(t, e, i, opts){
   if(!j) return `<div class="tok" data-t="${t}" data-i="${i}" style="left:${e.x}%;top:${e.y}%"><div class="shirt empty" style="border-color:${S.times[t].cor}">+</div><div class="tname empty">${sl.pos}</div></div>`;
   const g = (opts.gols!==false && j.gols>0) ? `<span class="gbadge">⚽${j.gols}</span>` : '';
   const p = opts.pos!==false ? `<span class="pdot" style="background:${posCol(j.pos)}">${j.pos}</span>` : '';
-  return `<div class="tok" data-t="${t}" data-i="${i}" style="left:${e.x}%;top:${e.y}%"><div class="shirt" style="${shirtStyle(j,t,sl.pos)}">${esc(j.num||'')}${g}${p}</div><div class="tname">${esc(short(j.nome))}</div></div>`;
+  const bg = teamBg(j,t,sl.pos);
+  const face = j.foto ? `<div class="shirt photo" style="background-image:url(${j.foto});border-color:${bg}">${j.num!==''&&j.num!=null?`<span class="nbadge" style="background:${bg};color:${contrast(bg)}">${esc(j.num)}</span>`:''}${g}${p}</div>`
+                      : `<div class="shirt" style="${shirtStyle(j,t,sl.pos)}">${esc(j.num||'')}${g}${p}</div>`;
+  return `<div class="tok" data-t="${t}" data-i="${i}" style="left:${e.x}%;top:${e.y}%">${face}<div class="tname">${esc(short(j.nome))}</div></div>`;
 }
 function pitchHTML(opts){
   return `<div class="pitch" id="${opts?'':'pitch'}">${SVG_FIELD}
@@ -318,6 +434,14 @@ function pitchHTML(opts){
 function rCampo(){
   const banco = S.banco.map(J).filter(Boolean);
   const livres = S.jog.filter(j=>!onField(j.id) && !S.banco.includes(j.id));
+  if(!ADMIN){
+    main.innerHTML = `${!S.jog.length?`<div class="banner">⏳ O administrador ainda não publicou a escalação. Ela aparece aqui sozinha.</div>`:'<div style="height:10px"></div>'}
+    ${pitchHTML()}
+    <div class="hint">👀 Você está acompanhando · toque num jogador para ver os detalhes</div>
+    <div class="ttl">Reservas / próximos (${banco.length})</div>
+    <div class="bench">${banco.length?banco.map(j=>`<div class="b" onclick="playerView('${j.id}')">${avatar(j,'#475569',38)}<div class="tname">${esc(short(j.nome))}</div></div>`).join(''):'<div class="hint" style="margin:4px">—</div>'}</div>`;
+    bindDrag(); return;
+  }
   main.innerHTML = `
   <div class="chips">${[0,1].map(t=>`<button class="chip ${t===selT?'on':''}" onclick="selT=${t};rCampo()"><span class="dot" style="background:${S.times[t].cor}"></span>${esc(S.times[t].nome)}</button>`).join('')}
     <span style="color:var(--mut);font-size:12.5px;align-self:center;margin-left:4px">formação de linha:</span></div>
@@ -331,7 +455,7 @@ function rCampo(){
     <button class="btn sec sm" style="flex:.8" onclick="limparCampo()">🧹</button>
   </div>
   <div class="ttl">Reservas / próximos (${banco.length})</div>
-  <div class="bench">${banco.map(j=>`<div class="b" onclick="benchSheet('${j.id}')"><div class="shirt" style="${shirtStyle(j,-1)}">${esc(j.num||'')}</div><div class="tname">${esc(short(j.nome))}</div></div>`).join('')}
+  <div class="bench">${banco.map(j=>`<div class="b" onclick="benchSheet('${j.id}')">${avatar(j,'#475569',38)}<div class="tname">${esc(short(j.nome))}</div></div>`).join('')}
     <div class="b" onclick="addBancoSheet()"><div class="shirt empty">+</div><div class="tname empty">Adicionar</div></div></div>
   ${livres.length?`<div class="hint">${livres.length} jogador(es) do elenco fora da lista</div>`:''}`;
   bindDrag();
@@ -396,7 +520,7 @@ function bindDrag(){
       try{ el.setPointerCapture(id); }catch(e){}
     });
     el.addEventListener('pointermove', ev=>{
-      if(id!==ev.pointerId) return;
+      if(id!==ev.pointerId || !ADMIN) return;
       if(!moved && Math.hypot(ev.clientX-sx, ev.clientY-sy) > 7){ moved=true; el.classList.add('drag'); }
       if(moved){
         const x = Math.min(95, Math.max(5, (ev.clientX-rect.left)/rect.width*100));
@@ -407,7 +531,7 @@ function bindDrag(){
     const up = ev=>{
       if(id!==ev.pointerId) return; id=null; el.classList.remove('drag');
       const t = +el.dataset.t, i = +el.dataset.i;
-      if(moved){ if(el._x!=null){ S.times[t].esc[i].x=+el._x.toFixed(1); S.times[t].esc[i].y=+el._y.toFixed(1); save(); } }
+      if(moved && ADMIN){ if(el._x!=null){ S.times[t].esc[i].x=+el._x.toFixed(1); S.times[t].esc[i].y=+el._y.toFixed(1); save(); } }
       else if(ev.type==='pointerup') slotSheet(t,i);
     };
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
@@ -417,6 +541,7 @@ function bindDrag(){
 /* ---- sheets do campo ---- */
 function slotSheet(t,i){
   const e = S.times[t].esc[i], j = e.pid && J(e.pid);
+  if(!ADMIN){ if(j) playerView(j.id); else toast('Vaga livre'); return; }
   if(!j) return pickSheet(t,i);
   openSheet(playerForm(j, {slot:i, team:t}));
 }
@@ -430,7 +555,7 @@ function pickSheet(t, i, swap){
   openSheet(`<div class="sh-h">${shield(t)}<h2>${swap?'Trocar':'Escolher'} · ${sl.pos}</h2><button class="ib" onclick="closeSheet()">✕</button></div>
    <button class="btn full" onclick="newPlayerSheet(${t},${i})">＋ Cadastrar novo jogador</button>
    <div class="pick">${list.length? list.map(j=>{ const tt=teamOf(j.id); return `<div class="pl" onclick="putSlot(${t},${i},'${j.id}')">
-      <div class="num" style="${shirtStyle(j,tt)}">${esc(j.num||'')}</div>
+      ${avatar(j, teamBg(j,tt), 40)}
       <div class="info"><div class="nm">${esc(j.nome)}</div><div class="sub"><span class="tag" style="background:${posCol(j.pos)}">${j.pos}</span>${statusTxt(j.id)}</div></div>
       <div class="stat"><b>${j.gols}</b><span>gols</span></div></div>`; }).join('') : '<div class="empty-st">Nenhum jogador no elenco ainda</div>'}</div>`);
 }
@@ -469,7 +594,7 @@ function benchToField(pid){
 /* ---- formulário de jogador ---- */
 let F = null;
 function playerForm(j, ctx){
-  F = {id:j?j.id:null, nome:j?j.nome:'', num:j?j.num:'', pos:j?j.pos:(ctx&&ctx.pos)||'ALA', gols:j?j.gols:0, assist:j?j.assist:0, jogos:j?j.jogos:0, ctx:ctx||{}};
+  F = {id:j?j.id:null, foto:j?(j.foto||''):'', nome:j?j.nome:'', num:j?j.num:'', pos:j?j.pos:(ctx&&ctx.pos)||'ALA', gols:j?j.gols:0, assist:j?j.assist:0, jogos:j?j.jogos:0, ctx:ctx||{}};
   const c = F.ctx;
   let acts = '';
   if(j && c.slot!=null && c.team!=null) acts = `<button class="btn sec" onclick="pickSheet(${c.team},${c.slot},true)">⇄ Trocar</button><button class="btn sec" onclick="toBench(${c.team},${c.slot})">🪑 Pra reserva</button>`;
@@ -480,6 +605,11 @@ function playerForm(j, ctx){
     <div><label class="f">Nome</label><input class="inp" id="fNome" value="${esc(F.nome)}" placeholder="Nome do jogador" maxlength="28"></div>
     <div><label class="f">Número</label><input class="inp" id="fNum" type="number" inputmode="numeric" value="${esc(F.num)}" placeholder="10" oninput="document.getElementById('fNumBall').textContent=this.value"></div>
   </div>
+  <label class="f">Foto do jogador</label>
+  <div class="row"><div id="fAva">${avatar(F, posCol(F.pos), 64)}</div>
+    <button class="btn sec sm" onclick="document.getElementById('fFile').click()">📷 Escolher foto</button>
+    <button class="btn red sm" id="fRem" onclick="fRemFoto()" style="${F.foto?'':'display:none'}">Remover</button>
+    <input type="file" id="fFile" accept="image/*" style="display:none" onchange="fFoto(this)"></div>
   <label class="f">Posição: <b id="fPosN" style="color:var(--txt)">${POS[F.pos].n}</b></label>
   <div class="posgrid">${POS_KEYS.map(p=>`<button data-p="${p}" class="${p===F.pos?'on':''}" style="${p===F.pos?'background:'+posCol(p):''}" onclick="fPos('${p}')">${p}</button>`).join('')}</div>
   <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -493,13 +623,28 @@ function playerForm(j, ctx){
 function fPos(p){
   F.pos=p; document.querySelectorAll('.posgrid button').forEach(b=>{ const on=b.dataset.p===p; b.classList.toggle('on',on); b.style.background=on?posCol(p):''; });
   document.getElementById('fPosN').textContent=POS[p].n; document.getElementById('fNumBall').style.background=posCol(p);
+  document.getElementById('fAva').innerHTML = avatar(F, posCol(p), 64);
 }
+function fFoto(inp){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  const url = URL.createObjectURL(f), img = new Image();
+  img.onload = ()=>{
+    const N = 160, c = document.createElement('canvas'); c.width = c.height = N;
+    const w = img.naturalWidth, h = img.naturalHeight, k = Math.min(w,h);
+    c.getContext('2d').drawImage(img, (w-k)/2, (h-k)*0.25, k, k, 0, 0, N, N);
+    F.foto = c.toDataURL('image/jpeg', 0.75); URL.revokeObjectURL(url);
+    document.getElementById('fAva').innerHTML = avatar(F, posCol(F.pos), 64); document.getElementById('fRem').style.display = '';
+  };
+  img.onerror = ()=>{ toast('Não consegui abrir essa imagem'); URL.revokeObjectURL(url); };
+  img.src = url; inp.value = '';
+}
+function fRemFoto(){ F.foto = ''; document.getElementById('fAva').innerHTML = avatar(F, posCol(F.pos), 64); document.getElementById('fRem').style.display = 'none'; }
 function fStep(k,d){ F[k]=Math.max(0,(+F[k]||0)+d); document.getElementById('f_'+k).textContent=F[k]; }
 function fSave(){
   const nome = document.getElementById('fNome').value.trim();
   if(!nome){ toast('Digite o nome do jogador'); document.getElementById('fNome').focus(); return; }
   const num = document.getElementById('fNum').value.trim();
-  const data = {nome, num: num===''?'':Math.max(0,Math.min(999,parseInt(num)||0)), pos:F.pos, gols:F.gols, assist:F.assist, jogos:F.jogos};
+  const data = {nome, foto:F.foto||'', num: num===''?'':Math.max(0,Math.min(999,parseInt(num)||0)), pos:F.pos, gols:F.gols, assist:F.assist, jogos:F.jogos};
   if(F.id){ Object.assign(J(F.id),data); }
   else {
     const j=Object.assign({id:uid()},data); S.jog.push(j);
@@ -521,6 +666,16 @@ function delPlayer(id){
     save(); closeSheet(); render(); toast('Jogador excluído'); }, 'Excluir');
 }
 
+function playerView(id){
+  const j = J(id); if(!j) return; const t = teamOf(id);
+  openSheet(`<div class="sh-h"><h2>${esc(j.nome)}</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <div class="row" style="gap:16px">${avatar(j, t>=0?teamBg(j,t):posCol(j.pos), 92)}
+    <div><div><span class="tag" style="background:${posCol(j.pos)}">${j.pos}</span>${POS[j.pos].n}</div>
+    <div style="color:var(--mut);margin-top:8px">${j.num!==''&&j.num!=null?'Camisa '+esc(j.num)+' · ':''}${t>=0?esc(S.times[t].nome):S.banco.includes(id)?'Reserva':'Fora da lista'}</div></div></div>
+  <div class="kpis" style="margin-top:14px"><div class="kpi"><b>${j.gols}</b><span>gols</span></div><div class="kpi"><b>${j.assist}</b><span>assistências</span></div><div class="kpi"><b>${j.jogos}</b><span>jogos</span></div></div>
+  ${j.jogos?`<div class="hint">Média de ${(j.gols/j.jogos).toFixed(2)} gol(s) por jogo</div>`:''}`);
+}
+
 /* ================== ELENCO ================== */
 let fltPos='todos', q='';
 function rElenco(){
@@ -529,7 +684,7 @@ function rElenco(){
   <input class="search" placeholder="🔎 Buscar por nome ou número" value="${esc(q)}" oninput="q=this.value;rElencoList()">
   <div class="chips">${['todos',0,1,2,3].map(g=>`<button class="chip ${String(g)===String(fltPos)?'on':''}" onclick="fltPos='${g}';rElenco()">${g==='todos'?'Todos ('+S.jog.length+')':GNAME[g]}</button>`).join('')}</div>
   <div id="elist"></div>
-  <button class="btn fab" onclick="openSheet(playerForm(null,{}))">＋ Jogador</button>`;
+  ${ADMIN?`<button class="btn fab" onclick="openSheet(playerForm(null,{}))">＋ Jogador</button>`:''}`;
   rElencoList();
 }
 function rElencoList(){
@@ -537,15 +692,15 @@ function rElencoList(){
   const list = S.jog.filter(j=>(fltPos==='todos'||POS[j.pos].g==+fltPos) && (!q || j.nome.toLowerCase().includes(q.toLowerCase()) || String(j.num)===q.trim()));
   list.sort((a,b)=>POS[a.pos].g-POS[b.pos].g || (a.num||999)-(b.num||999));
   el.innerHTML = list.length ? list.map(j=>{ const t=teamOf(j.id); return `<div class="pl">
-    <div class="num" style="background:${posCol(j.pos)}" onclick="editP('${j.id}')">${esc(j.num||'–')}</div>
+    <div onclick="editP('${j.id}')">${avatar(j, posCol(j.pos), 40)}</div>
     <div class="info" onclick="editP('${j.id}')"><div class="nm">${esc(j.nome)}</div>
       <div class="sub"><span class="tag" style="background:${posCol(j.pos)}">${j.pos}</span>${POS[j.pos].n}${t>=0?` · <span style="color:${S.times[t].cor==='#111827'?'#cbd5e1':S.times[t].cor};font-weight:700">${esc(S.times[t].nome)}</span>`:S.banco.includes(j.id)?' · 🪑 reserva':''}</div></div>
     <div class="stat"><b>${j.gols}</b><span>gols</span></div>
-    <button class="plus" onclick="quickGol('${j.id}')">⚽+</button></div>`; }).join('')
+    ${ADMIN?`<button class="plus" onclick="quickGol('${j.id}')">⚽+</button>`:''}</div>`; }).join('')
     : `<div class="empty-st"><b>👥</b>Nenhum jogador encontrado</div>`;
 }
-function editP(id){ openSheet(playerForm(J(id),{})); }
-function quickGol(id){ const j=J(id); j.gols++; save(); rElencoList(); toast('⚽ Gol de '+j.nome+'! Total: '+j.gols); }
+function editP(id){ if(!ADMIN) return playerView(id); openSheet(playerForm(J(id),{})); }
+function quickGol(id){ if(!ADMIN) return; const j=J(id); j.gols++; save(); rElencoList(); toast('⚽ Gol de '+j.nome+'! Total: '+j.gols); }
 
 /* ================== GOLS / ARTILHARIA ================== */
 function rGols(){
@@ -559,11 +714,11 @@ function rGols(){
     <div class="kpi"><b>${pts}</b><span>partidas</span></div>
     <div class="kpi"><b>${pts?(S.partidas.reduce((s,p)=>s+p.ga+p.gb,0)/pts).toFixed(1):'–'}</b><span>gols/jogo</span></div>
   </div>
-  <button class="btn full" style="margin-top:10px" onclick="matchSheet()">＋ Registrar partida e gols</button>
+  ${ADMIN?`<button class="btn full" style="margin-top:10px" onclick="matchSheet()">＋ Registrar partida e gols</button>`:''}
   <div class="ttl">🏆 Artilharia</div>
   <div class="card" style="padding:4px 10px">${rank.length ? rank.map((j,i)=>`<div class="rk" onclick="editP('${j.id}')">
       <div class="pos ${i<3?'m'+(i+1):''}">${i<3?['🥇','🥈','🥉'][i]:i+1+'º'}</div>
-      <div class="num" style="background:${posCol(j.pos)};width:34px;height:34px;font-size:13px">${esc(j.num||'')}</div>
+      ${avatar(j, posCol(j.pos), 36)}
       <div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between"><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.nome)}</b><b>${j.gols} ⚽</b></div>
         <div class="bar"><i style="width:${Math.max(3,j.gols/max*100)}%"></i></div>
         <div class="sub" style="color:var(--mut);font-size:11.5px;margin-top:3px">${j.pos} · ${j.assist} assist. · ${j.jogos} jogos${j.jogos?' · média '+(j.gols/j.jogos).toFixed(2):''}</div></div></div>`).join('')
@@ -614,8 +769,8 @@ function matchView(id){
   const p=S.partidas.find(x=>x.id===id); if(!p) return;
   openSheet(`<div class="sh-h"><h2>${esc(p.na)} x ${esc(p.nb)}</h2><button class="ib" onclick="closeSheet()">✕</button></div>
   <div class="card" style="text-align:center"><div style="font-size:34px;font-weight:800">${p.ga} x ${p.gb}</div><div class="sub" style="color:var(--mut)">${fmtData(p.data)}</div></div>
-  <div class="ttl">Gols</div>${p.marc.length?p.marc.map(m=>{const j=J(m.pid);return j?`<div class="pl"><div class="num" style="background:${posCol(j.pos)}">${esc(j.num||'')}</div><div class="info"><div class="nm">${esc(j.nome)}</div></div><b>${'⚽'.repeat(Math.min(m.g,6))}${m.g>6?' '+m.g:''}</b></div>`:''}).join(''):'<div class="hint">Sem marcadores registrados</div>'}
-  <button class="btn red full" style="margin-top:14px" onclick="delMatch('${p.id}')">🗑️ Excluir partida (desfaz os gols)</button>`);
+  <div class="ttl">Gols</div>${p.marc.length?p.marc.map(m=>{const j=J(m.pid);return j?`<div class="pl">${avatar(j, posCol(j.pos), 40)}<div class="info"><div class="nm">${esc(j.nome)}</div></div><b>${'⚽'.repeat(Math.min(m.g,6))}${m.g>6?' '+m.g:''}</b></div>`:''}).join(''):'<div class="hint">Sem marcadores registrados</div>'}
+  ${ADMIN?`<button class="btn red full" style="margin-top:14px" onclick="delMatch('${p.id}')">🗑️ Excluir partida (desfaz os gols)</button>`:''}`);
 }
 function delMatch(id){
   const p=S.partidas.find(x=>x.id===id); ask('Excluir esta partida? Os gols dela serão descontados da artilharia.', ()=>{
@@ -626,15 +781,15 @@ function delMatch(id){
 
 /* ================== PRÉVIA ================== */
 function rPrevia(){
-  const o = S.pv;
+  const o = PV;
   const top = [...S.jog].filter(j=>j.gols>0).sort((a,b)=>b.gols-a.gols).slice(0,3);
   const banco = S.banco.map(J).filter(Boolean);
   const d = new Date();
   main.innerHTML = `
   <div class="chips">
-    <button class="chip ${o.gols?'on':''}" onclick="S.pv.gols=!S.pv.gols;save();render()">⚽ Gols</button>
-    <button class="chip ${o.pos?'on':''}" onclick="S.pv.pos=!S.pv.pos;save();render()">🏷️ Posições</button>
-    <button class="chip ${o.banco?'on':''}" onclick="S.pv.banco=!S.pv.banco;save();render()">🪑 Reservas</button>
+    <button class="chip ${o.gols?'on':''}" onclick="PV.gols=!PV.gols;savePV();render()">⚽ Gols</button>
+    <button class="chip ${o.pos?'on':''}" onclick="PV.pos=!PV.pos;savePV();render()">🏷️ Posições</button>
+    <button class="chip ${o.banco?'on':''}" onclick="PV.banco=!PV.banco;savePV();render()">🪑 Reservas</button>
   </div>
   <div class="pv" id="pv">
     <div class="pv-h" style="justify-content:center;text-align:center">
@@ -651,17 +806,29 @@ function rPrevia(){
 
 /* ================== CONFIG ================== */
 function openConfig(){
+  if(!ADMIN){
+    openSheet(`<div class="sh-h"><h2>⚙️ JA Escalação</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+    <div class="banner ok">👀 Você está <b>acompanhando</b>. A escalação, os gols e as partidas atualizam sozinhos quando o administrador mexe.</div>
+    <div class="hint" style="text-align:left">Status: ${syncTxt()}</div>
+    <button class="btn sec full" style="margin-top:10px" onclick="pull(true,true);closeSheet()">🔄 Atualizar agora</button>
+    <button class="btn sec full" style="margin-top:8px" onclick="adminSheet()">👑 Sou o administrador</button>
+    <div class="brand" style="margin-top:16px">JA Escalação v1.2 · Futsal 6x6 · por Jadilson Alves</div>`);
+    return;
+  }
   const bloco = t => { const T=S.times[t]; return `<div class="card">
     <div class="row">${shield(t)}<input class="inp" value="${esc(T.nome)}" maxlength="20" oninput="S.times[${t}].nome=this.value||'Time ${t?'B':'A'}';save();header()"></div>
     <label class="f">Cor do colete / camisa</label><div class="sw">${COLORS.map(c=>`<button style="background:${c}" class="${c===T.cor?'on':''}" onclick="setCor(${t},'cor','${c}',this)"></button>`).join('')}</div>
     <label class="f">Camisa do goleiro</label><div class="sw">${GKCOLORS.map(c=>`<button style="background:${c}" class="${c===T.gk?'on':''}" onclick="setCor(${t},'gk','${c}',this)"></button>`).join('')}</div></div>`; };
   openSheet(`<div class="sh-h"><h2>⚙️ Times</h2><button class="ib" onclick="closeSheet()">✕</button></div>
   ${bloco(0)}${bloco(1)}
+  <div class="ttl">Publicação</div>
+  <div class="hint" style="text-align:left">Status: ${syncTxt()} · tudo que você edita aparece para todo mundo.</div>
+  <div class="acts" style="margin-top:0"><button class="btn sec" onclick="publishNow();toast('Publicando…')">⏫ Publicar agora</button><button class="btn sec" onclick="adminLogout()">🚪 Sair do admin</button></div>
   <div class="ttl">Backup</div>
   <div class="acts" style="margin-top:0"><button class="btn sec" onclick="exportar()">📤 Copiar backup</button><button class="btn sec" onclick="importar()">📥 Restaurar</button></div>
   <div class="ttl">Zerar</div>
   <div class="acts" style="margin-top:0"><button class="btn sec" onclick="zerarGols()">0️⃣ Zerar gols</button><button class="btn red" onclick="apagarTudo()">🗑️ Apagar tudo</button></div>
-  <div class="brand" style="margin-top:16px">JA Escalação v1.1 · Futsal 6x6 · por Jadilson Alves</div>`);
+  <div class="brand" style="margin-top:16px">JA Escalação v1.2 · Futsal 6x6 · por Jadilson Alves</div>`);
 }
 function setCor(t,k,c,el){ S.times[t][k]=c; save(); el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on')); el.classList.add('on');
   const sh = el.closest('.card').querySelector('.shield'); if(sh && k==='cor'){ sh.style.background=c; sh.style.color=contrast(c); } render(); }
@@ -690,10 +857,10 @@ function restaurar(){
 function zerarGols(){ ask('Zerar gols, assistências e jogos de todos? As partidas também serão apagadas.', ()=>{ S.jog.forEach(j=>{j.gols=0;j.assist=0;j.jogos=0;}); S.partidas=[]; save(); closeSheet(); render(); toast('Estatísticas zeradas'); }, 'Zerar'); }
 function apagarTudo(){ ask('Apagar o elenco inteiro e começar do zero?', ()=>{
   const nt = base(); nt.times.forEach((T,i)=>{ T.nome=S.times[i].nome; T.cor=S.times[i].cor; T.gk=S.times[i].gk; T.form=S.times[i].form; });
-  nt.pv = S.pv; S = nt; resetSlots(); fixEsc(); save(); closeSheet(); go('elenco'); toast('Tudo apagado'); }, 'Apagar'); }
+  S = nt; resetSlots(); fixEsc(); save(); closeSheet(); go('elenco'); toast('Tudo apagado'); }, 'Apagar'); }
 
 /* ================== INÍCIO ================== */
-load(); render();
+load(); render(); pull(); startPolling();
 </script>
 </body>
 </html>

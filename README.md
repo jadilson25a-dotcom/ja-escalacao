@@ -3,23 +3,34 @@
 <h1 align="center">JA Escalação</h1>
 <p align="center">App Android para montar a escalação do futsal — <b>6 de cada lado (goleiro + 5 na linha)</b>, editar jogadores, controlar gols e ver a prévia dos times.</p>
 
-<p align="center"><b>⬇️ <a href="https://github.com/jadilson25a-dotcom/ja-escalacao/raw/main/apk/JA-Escalacao.apk">Baixar o APK (v1.1)</a></b></p>
+<p align="center"><b>⬇️ <a href="https://github.com/jadilson25a-dotcom/ja-escalacao/raw/main/apk/JA-Escalacao.apk">Baixar o APK (v1.2)</a></b></p>
 
-| Quadra | Editar jogador | Artilharia | Prévia |
-|---|---|---|---|
-| <img src="docs/campo.png" width="200"> | <img src="docs/editar.png" width="200"> | <img src="docs/artilharia.png" width="200"> | <img src="docs/previa.png" width="200"> |
+| Quadra | Jogador | Artilharia | Prévia | Admin |
+|---|---|---|---|---|
+| <img src="docs/campo.png" width="170"> | <img src="docs/editar.png" width="170"> | <img src="docs/artilharia.png" width="170"> | <img src="docs/previa.png" width="170"> | <img src="docs/admin.png" width="170"> |
+
+## Administrador e espectadores
+
+- **Só o administrador edita.** Quem tem a chave de acesso (token do GitHub) entra em ⚙️ → **Sou o administrador** e pode mexer em tudo.
+- **Todo mundo que instala o app acompanha**: escalação, gols, partidas e fotos atualizam sozinhos (a cada ~30 s, ou no botão 🔄). Quem não é admin não vê nenhum botão de edição.
+- Cada alteração do admin é publicada automaticamente no arquivo [`dados/escalacao.json`](dados/escalacao.json) deste repositório.
+
+**Criar o token do administrador (uma vez só):** GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token → Repository access: *Only select repositories → ja-escalacao* → Permissions: *Contents: Read and write* → Generate. Cole no app. Não compartilhe esse token.
+
+> Como o repositório é público, os dados publicados (nomes, gols e fotos) também ficam visíveis na internet.
 
 ## Funções
 
 - **Quadra com os dois times** (Time A embaixo, Time B em cima), cada um com goleiro + 5 na linha.
 - **Formações de linha:** 2-2-1, 1-2-2, 2-1-2, 1-3-1, 3-1-1, 3-2 e 2-3 — cada time escolhe a sua.
+- **Foto do jogador** no lugar do número: aparece na quadra, no elenco, na artilharia e na prévia.
 - **Toque no jogador** para editar nome, número, posição (GOL, Fixo, Zagueiro, Ala, Meia, Pivô, Atacante), gols, assistências e jogos. **Arraste** para mudar a posição na quadra.
 - **🎲 Sortear times:** um goleiro para cada lado e o resto dividido de forma equilibrada pelos gols.
 - **Reservas / próximos:** escolha em qual time e no lugar de quem o reserva entra.
 - **Base de gols:** ranking de artilharia, registro de partidas Time A x Time B com quem marcou (o placar sobe sozinho), excluir partida desfaz os gols.
 - **Prévia:** cartão com os dois times na quadra, artilheiros e reservas — pronto para print e mandar no grupo.
 - **Times:** nome, cor do colete e cor da camisa do goleiro de cada time.
-- **Backup** por texto (copiar e restaurar) e funciona **100% off-line** — os dados ficam salvos no celular.
+- **Backup** por texto (copiar e restaurar). Sem internet, o app mostra os últimos dados recebidos.
 
 ## Como instalar
 
@@ -29,7 +40,7 @@
 
 ## Como é feito
 
-O app é uma página HTML/JS ([`app/assets/index.html`](app/assets/index.html)) rodando dentro de um WebView Android.
+O app é uma página HTML/JS ([`app/assets/index.html`](app/assets/index.html)) rodando dentro de um WebView Android, que lê e grava os dados pela API do GitHub. A parte nativa só abre o seletor de fotos.
 O script [`app/build_apk.py`](app/build_apk.py) monta o APK sem precisar do Android Studio: gera o `classes.dex`, o `AndroidManifest.xml` binário, o `resources.arsc` com o ícone, alinha o zip e assina com APK Signature Scheme v2.
 
 ```bash
