@@ -3,7 +3,7 @@
 <h1 align="center">JA Escalação</h1>
 <p align="center">App Android para montar a escalação do futsal — <b>6 de cada lado (goleiro + 5 na linha)</b>, editar jogadores, controlar gols e ver a prévia dos times.</p>
 
-<p align="center"><b>⬇️ <a href="../../releases/latest">Baixar o APK (última versão)</a></b></p>
+<p align="center"><b>⬇️ <a href="https://github.com/jadilson25a-dotcom/ja-escalacao/raw/main/apk/JA-Escalacao.apk">Baixar o APK (v1.1)</a></b></p>
 
 | Quadra | Editar jogador | Artilharia | Prévia |
 |---|---|---|---|
@@ -23,7 +23,7 @@
 
 ## Como instalar
 
-1. Baixe o arquivo `.apk` na página de [Releases](../../releases/latest).
+1. Baixe o [JA-Escalacao.apk](https://github.com/jadilson25a-dotcom/ja-escalacao/raw/main/apk/JA-Escalacao.apk) (fica na pasta `apk/`).
 2. Abra o arquivo no celular e permita **“instalar apps desconhecidos”** quando o Android pedir.
 3. Requer Android 7.0 ou mais novo.
 
