@@ -1,0 +1,4 @@
+keys/
+*.apk
+app/out_*
+__pycache__/

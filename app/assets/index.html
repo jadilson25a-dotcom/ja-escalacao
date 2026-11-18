@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>JA Escalação</title>
+<style>
+:root{
+  --bg:#07140d; --bg2:#0d2117; --card:#122a1e; --card2:#173525; --line:#24503a;
+  --txt:#eef7f1; --mut:#93b3a2; --acc:#3ddc84; --acc2:#1fa463; --warn:#ffb020; --red:#ff5a5f;
+  --gol:#f5b301; --def:#2f80ed; --mei:#22b35e; --ata:#e5484d;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Roboto,"Segoe UI",sans-serif;font-size:15px;overscroll-behavior:none}
+body{display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+input,select,textarea,button{font:inherit;color:inherit}
+input,textarea{user-select:text;-webkit-user-select:text}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;background:linear-gradient(180deg,#0e2a1b,#07140d)}
+.shield{width:38px;height:38px;border-radius:10px 10px 19px 19px;display:grid;place-items:center;font-weight:800;font-size:14px;border:2px solid rgba(255,255,255,.85);flex:none}
+header h1{font-size:18px;margin:0;line-height:1.1}
+header small{color:var(--mut);font-size:12px}
+header .sp{flex:1}
+.ib{background:var(--card);border:1px solid var(--line);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;font-size:18px}
+main{flex:1;overflow-y:auto;padding:0 12px 90px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0a1d13;border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:20}
+nav button{flex:1;background:none;border:0;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;padding:4px 0;border-radius:12px}
+nav button b{font-size:20px;line-height:1;font-weight:400}
+nav button.on{color:var(--acc);background:rgba(61,220,132,.09)}
+.row{display:flex;gap:8px;align-items:center}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:7px 12px;border-radius:20px;background:var(--card);border:1px solid var(--line);color:var(--mut);font-size:13px;font-weight:600}
+.chip.on{background:var(--acc);color:#05230f;border-color:var(--acc)}
+.btn{background:var(--acc);color:#05230f;border:0;border-radius:12px;padding:11px 14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.sec{background:var(--card2);color:var(--txt);border:1px solid var(--line)}
+.btn.red{background:rgba(255,90,95,.14);color:var(--red);border:1px solid rgba(255,90,95,.35)}
+.btn.sm{padding:9px 8px;font-size:12.5px;border-radius:10px;white-space:nowrap}
+.btn.full{width:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin:10px 0}
+.ttl{font-size:13px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:16px 2px 6px}
+
+/* ---- campo ---- */
+.pitch{position:relative;width:100%;aspect-ratio:68/110;border-radius:14px;overflow:hidden;
+  background:repeating-linear-gradient(180deg,#2e8b47 0 8.33%,#287f40 8.33% 16.66%);box-shadow:0 6px 20px rgba(0,0,0,.45),inset 0 0 0 3px rgba(255,255,255,.08)}
+.pitch svg{position:absolute;inset:0;width:100%;height:100%}
+.tok{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;width:70px;touch-action:none;z-index:2}
+.tok.drag{z-index:5;filter:drop-shadow(0 8px 10px rgba(0,0,0,.5))}
+.shirt{position:relative;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:17px;border:2.5px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.4)}
+.shirt.empty{background:rgba(0,0,0,.22)!important;border:2px dashed rgba(255,255,255,.75);color:#fff;font-size:22px;font-weight:400;box-shadow:none}
+.gbadge{position:absolute;top:-6px;right:-10px;background:#fff;color:#111;border-radius:10px;font-size:10.5px;font-weight:800;padding:1px 5px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.pdot{position:absolute;bottom:-4px;left:-8px;font-size:9px;font-weight:800;padding:1px 4px;border-radius:6px;color:#fff;border:1px solid rgba(255,255,255,.6)}
+.tname{margin-top:3px;background:rgba(0,0,0,.62);padding:2px 7px;border-radius:8px;font-size:11.5px;font-weight:700;max-width:78px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tname.empty{background:rgba(0,0,0,.3);color:#d9f3e3;font-weight:600}
+.bench{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 4px}
+.bench .b{flex:none;display:flex;flex-direction:column;align-items:center;width:62px}
+.bench .shirt{width:38px;height:38px;font-size:14px}
+.bench .tname{font-size:10.5px;max-width:62px}
+.hsh{display:flex;flex:none}.hsh .s2{margin-left:-10px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid rgba(255,255,255,.6)}
+.tlabel{position:absolute;left:8px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:8px;z-index:1;opacity:.92;max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tlabel.top{top:calc(50% - 22px)}.tlabel.bot{top:calc(50% + 6px)}
+.pv-h .shield{flex:none}
+.hint{color:var(--mut);font-size:12.5px;text-align:center;margin:8px 0}
+
+/* ---- listas ---- */
+.pl{display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin:8px 0}
+.num{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;flex:none;color:#fff;font-size:15px}
+.pl .info{flex:1;min-width:0}
+.pl .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl .sub{color:var(--mut);font-size:12.5px;margin-top:2px}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:6px;color:#fff;margin-right:4px}
+.stat{text-align:center;min-width:34px}
+.stat b{display:block;font-size:17px}
+.stat span{font-size:10.5px;color:var(--mut)}
+.plus{white-space:nowrap;width:48px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--card2);font-size:16px;flex:none}
+.search{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none}
+.fab{position:fixed;right:16px;bottom:84px;z-index:15;border-radius:18px;padding:14px 18px;box-shadow:0 8px 20px rgba(0,0,0,.45)}
+.empty-st{text-align:center;color:var(--mut);padding:30px 10px}
+.empty-st b{display:block;font-size:40px;margin-bottom:6px}
+
+/* ---- artilharia ---- */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+.kpi b{display:block;font-size:22px}
+.kpi span{font-size:11.5px;color:var(--mut)}
+.rk{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid rgba(36,80,58,.6)}
+.rk:last-child{border:0}
+.rk .pos{width:26px;text-align:center;font-weight:800;color:var(--mut)}
+.rk .pos.m1{color:#ffd54a}.rk .pos.m2{color:#cfd8dc}.rk .pos.m3{color:#e0a070}
+.bar{height:7px;border-radius:5px;background:rgba(255,255,255,.08);margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc2),var(--acc));border-radius:5px}
+.match{display:flex;align-items:center;gap:10px}
+.score{font-weight:800;font-size:18px;padding:6px 10px;border-radius:10px;background:var(--card2);min-width:64px;text-align:center}
+.score.v{color:var(--acc)}.score.d{color:var(--red)}.score.e{color:var(--warn)}
+
+/* ---- sheet ---- */
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:#0f241a;border-top-left-radius:22px;border-top-right-radius:22px;border-top:1px solid var(--line);
+  max-height:88vh;overflow-y:auto;padding:8px 16px calc(18px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s ease}
+#sheet.open{transform:none}
+.grab{width:42px;height:5px;border-radius:3px;background:#2f5a44;margin:4px auto 10px}
+.sh-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sh-h h2{margin:0;font-size:18px;flex:1}
+label.f{display:block;font-size:12.5px;color:var(--mut);margin:10px 0 4px;font-weight:600}
+.inp{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none}
+.inp:focus{border-color:var(--acc)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.step{display:flex;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.step button{width:46px;height:44px;border:0;background:var(--card2);font-size:20px;font-weight:700}
+.step b{flex:1;text-align:center;font-size:18px}
+.posgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.posgrid button{padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--card);font-weight:800;font-size:12.5px}
+.posgrid button.on{color:#fff;border-color:transparent}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.pick{max-height:46vh;overflow-y:auto}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#e9fff2;color:#05230f;padding:10px 16px;border-radius:12px;font-weight:700;z-index:60;box-shadow:0 6px 16px rgba(0,0,0,.4);opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+.toast.on{opacity:1}
+.sw{display:flex;gap:8px;flex-wrap:wrap}
+.sw button{width:36px;height:36px;border-radius:50%;border:3px solid transparent}
+.sw button.on{border-color:#fff}
+.tgl{display:flex;align-items:center;justify-content:space-between;padding:10px 2px;border-bottom:1px solid rgba(36,80,58,.6)}
+.tgl input{width:22px;height:22px;accent-color:var(--acc)}
+
+/* ---- prévia ---- */
+.pv{background:linear-gradient(160deg,#0f3a24,#07140d 70%);border:1px solid var(--line);border-radius:20px;padding:14px;margin-top:10px}
+.pv-h{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pv-h .shield{width:50px;height:50px;font-size:18px}
+.pv-h h2{margin:0;font-size:21px}
+.pv-h p{margin:2px 0 0;color:var(--mut);font-size:12.5px}
+.pv .pitch .tok{width:80px}
+.pv-foot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pv-box{background:rgba(0,0,0,.25);border-radius:14px;padding:10px}
+.pv-box h4{margin:0 0 6px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.pv-box div{font-size:13px;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand{text-align:center;color:#5f8a74;font-size:11px;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div id="hShields" class="hsh"></div>
+  <div><h1 id="hName">Meu Time</h1><small id="hSub">Campo · 4-3-3</small></div>
+  <div class="sp"></div>
+  <button class="ib" onclick="openConfig()" aria-label="Configurações">⚙️</button>
+</header>
+<main id="main"></main>
+<nav id="nav">
+  <button data-t="campo" class="on"><b>🏟️</b>Campo</button>
+  <button data-t="elenco"><b>👥</b>Elenco</button>
+  <button data-t="gols"><b>⚽</b>Gols</button>
+  <button data-t="previa"><b>👁️</b>Prévia</button>
+</nav>
+<div id="ov" onclick="closeSheet()"></div>
+<div id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== DADOS FIXOS ================== */
+const POS = {
+  GOL:{n:'Goleiro',g:0}, FIX:{n:'Fixo',g:1}, ZAG:{n:'Zagueiro',g:1}, ALA:{n:'Ala',g:2}, MEI:{n:'Meia',g:2},
+  PIV:{n:'Pivô',g:3}, ATA:{n:'Atacante',g:3}
+};
+const POS_KEYS = ['GOL','FIX','ZAG','ALA','MEI','PIV','ATA'];
+const GCOL = ['#e0a100','#2f80ed','#1fa35a','#e5484d'];
+const GNAME = ['Goleiros','Defesa','Meio','Ataque'];
+const posCol = p => GCOL[(POS[p]||POS.MEI).g];
+const LINHA = 5; // + goleiro = 6 de cada lado
+const FORM = {
+  '2-2-1':[['FIX','FIX'],['ALA','ALA'],['PIV']],
+  '1-2-2':[['FIX'],['ALA','ALA'],['ATA','PIV']],
+  '2-1-2':[['FIX','FIX'],['MEI'],['ALA','PIV']],
+  '1-3-1':[['FIX'],['ALA','MEI','ALA'],['PIV']],
+  '3-1-1':[['ALA','FIX','ALA'],['MEI'],['PIV']],
+  '3-2':[['ALA','FIX','ALA'],['PIV','PIV']],
+  '2-3':[['FIX','FIX'],['ALA','PIV','ALA']]
+};
+const COLORS = ['#e11d48','#dc2626','#f97316','#eab308','#16a34a','#0d9488','#2563eb','#1e3a8a','#7c3aed','#db2777','#111827','#ffffff'];
+const GKCOLORS = ['#eab308','#f97316','#16a34a','#111827','#7c3aed','#0d9488','#db2777','#64748b'];
+
+/* posições na tela (0-100 do campo inteiro). Time 0 = embaixo (ataca pra cima), Time 1 = em cima */
+function slotsFor(t){
+  const rows = FORM[S.times[t].form] || FORM['2-2-1'];
+  const loc = [{x:50, y:89, pos:'GOL'}];
+  const n = rows.length, yBot = 65, yTop = n>=3 ? 17 : 27;
+  rows.forEach((r,ri)=>{
+    const y = n===1 ? 44 : yBot - (yBot-yTop)*ri/(n-1);
+    const c = r.length, m = c>=3 ? 18 : c===2 ? 28 : 50;
+    r.forEach((p,i)=>loc.push({x: c===1 ? 50 : m + (100-2*m)*i/(c-1), y, pos:p}));
+  });
+  return loc.map(s => t===0 ? {x:s.x, y:50+s.y/2, pos:s.pos} : {x:100-s.x, y:50-s.y/2, pos:s.pos});
+}
+
+/* ================== ESTADO ================== */
+const KEY = 'ja-escalacao-v2', OLDKEY = 'ja-escalacao-v1';
+let S;
+const uid = () => Math.random().toString(36).slice(2,9);
+function base(){
+  return {times:[{nome:'Time A', cor:'#e11d48', gk:'#eab308', form:'2-2-1', esc:[]},
+                 {nome:'Time B', cor:'#2563eb', gk:'#16a34a', form:'2-2-1', esc:[]}],
+          jog:[], banco:[], partidas:[], pv:{gols:true, pos:true, banco:true}};
+}
+function seed(){
+  const s = base();
+  const lista = [['Rogério','GOL',1,0],['Fernando','FIX',3,1],['Thiago','ALA',7,4],['Lucas','ALA',8,3],['Gabriel','PIV',9,7],['Bruno','MEI',10,5],
+                 ['Éder','GOL',12,0],['Danilo','FIX',4,2],['Rafael','ALA',11,6],['Pedro','ALA',6,2],['Vini','PIV',19,8],['Alex','ZAG',5,1],
+                 ['Marcos','ATA',17,3],['Caio','MEI',14,2]];
+  s.jog = lista.map(a=>({id:uid(), nome:a[0], pos:a[1], num:a[2], gols:a[3], assist:Math.max(0,a[3]-2), jogos:6}));
+  S = s; resetSlots(); fillAuto(); s.banco = s.jog.filter(j=>!onField(j.id)).map(j=>j.id);
+  return s;
+}
+function migrate(o){
+  const map = {LD:'ALA',LE:'ALA',VOL:'MEI',MC:'MEI',MEI:'MEI',PE:'ATA',PD:'ATA',SA:'ATA'};
+  const s = base();
+  s.jog = (o.jog||[]).map(j=>Object.assign({}, j, {pos: POS[j.pos] ? j.pos : (map[j.pos]||'MEI')}));
+  if(o.time){ s.times[0].nome = o.time.nome||'Time A'; s.times[0].cor = o.time.cor||s.times[0].cor; s.times[0].gk = o.time.gk||s.times[0].gk; }
+  s.partidas = (o.partidas||[]).map(p=>({id:p.id, data:p.data, na:(o.time&&o.time.nome)||'Meu Time', nb:p.adv||'Adversário', ga:p.gp||0, gb:p.gc||0, marc:p.marc||[], jogos:p.jogos||[]}));
+  s.pv = Object.assign(s.pv, o.pv||{});
+  S = s; resetSlots(); fillAuto(); s.banco = s.jog.filter(j=>!onField(j.id)).map(j=>j.id);
+  return s;
+}
+function load(){
+  try{
+    const t = localStorage.getItem(KEY);
+    if(t) S = JSON.parse(t);
+    else { const old = localStorage.getItem(OLDKEY); if(old){ S = migrate(JSON.parse(old)); save(); } }
+  }catch(e){ S = null; }
+  if(!S || !S.jog || !S.times) S = seed();
+  fixEsc();
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function resetSlots(){ [0,1].forEach(t=>{ const sl = slotsFor(t); const old = S.times[t].esc||[]; S.times[t].esc = sl.map((p,i)=>({pid: old[i]?old[i].pid:null, x:p.x, y:p.y})); }); }
+function fixEsc(){
+  S.pv = S.pv || {gols:true,pos:true,banco:true}; S.partidas = S.partidas||[]; S.banco = S.banco||[];
+  const ids = new Set(S.jog.map(j=>j.id)); const seen = new Set();
+  S.jog.forEach(j=>{ if(!POS[j.pos]) j.pos='MEI'; });
+  [0,1].forEach(t=>{
+    const T = S.times[t]; if(!FORM[T.form]) T.form='2-2-1';
+    const sl = slotsFor(t); T.esc = T.esc || [];
+    while(T.esc.length < sl.length){ const p = sl[T.esc.length]; T.esc.push({pid:null, x:p.x, y:p.y}); }
+    T.esc = T.esc.slice(0, sl.length);
+    T.esc.forEach(e=>{ if(e.pid && (!ids.has(e.pid) || seen.has(e.pid))) e.pid=null; if(e.pid) seen.add(e.pid); });
+  });
+  S.banco = S.banco.filter((id,i,a)=>ids.has(id) && !seen.has(id) && a.indexOf(id)===i);
+}
+const J = id => S.jog.find(j=>j.id===id);
+const teamOf = id => S.times.findIndex(T=>T.esc.some(e=>e.pid===id));
+const onField = id => teamOf(id) >= 0;
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const initials = n => (n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase() || '?';
+const short = n => { const p=(n||'').trim().split(/\s+/); return p.length>1 && p.join(' ').length>11 ? p[0] : (n||''); };
+function contrast(hex){ const h=hex.replace('#',''); const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16); return (r*299+g*587+b*114)/1000 > 150 ? '#111' : '#fff'; }
+const shield = (t, cls) => { const T=S.times[t]; return `<div class="shield ${cls||''}" style="background:${T.cor};color:${contrast(T.cor)}">${esc(initials(T.nome))}</div>`; };
+
+/* ================== UI GERAL ================== */
+let tab = 'campo', selT = 0;
+const main = document.getElementById('main');
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+function go(t){
+  tab=t; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
+  main.scrollTop=0; render();
+}
+function header(){
+  document.getElementById('hShields').innerHTML = shield(0) + shield(1,'s2');
+  document.getElementById('hName').textContent = S.times[0].nome + ' x ' + S.times[1].nome;
+  document.getElementById('hSub').textContent = 'Futsal · 6 x 6 · ' + S.jog.length + ' jogadores';
+}
+function render(){
+  header();
+  if(tab==='campo') rCampo(); else if(tab==='elenco') rElenco(); else if(tab==='gols') rGols(); else rPrevia();
+}
+let toastT;
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1700); }
+
+/* ---- sheet (com botão voltar do Android) ---- */
+let pushed=false;
+const ov=document.getElementById('ov'), sheet=document.getElementById('sheet');
+function openSheet(html){
+  sheet.innerHTML = '<div class="grab"></div>' + html; sheet.scrollTop = 0;
+  ov.style.display='block'; requestAnimationFrame(()=>sheet.classList.add('open'));
+  if(!pushed){ try{ history.pushState({s:1},''); pushed=true; }catch(e){} }
+}
+function hideSheet(){ sheet.classList.remove('open'); ov.style.display='none'; }
+function closeSheet(){ hideSheet(); if(pushed){ pushed=false; try{ history.back(); }catch(e){} } }
+window.addEventListener('popstate', ()=>{ if(pushed){ pushed=false; hideSheet(); } else if(sheet.classList.contains('open')) hideSheet(); });
+function ask(msg, fn, ok){
+  openSheet(`<div class="sh-h"><h2>Tem certeza?</h2></div><p style="color:var(--mut);margin:4px 0 6px">${esc(msg)}</p>
+  <div class="acts"><button class="btn sec" onclick="closeSheet()">Cancelar</button><button class="btn red" id="askOk">${ok||'Confirmar'}</button></div>`);
+  document.getElementById('askOk').onclick = fn;
+}
+
+/* ================== CAMPO (QUADRA) ================== */
+const SVG_FIELD = `<svg viewBox="0 0 68 110" preserveAspectRatio="none" fill="none" stroke="rgba(255,255,255,.8)" stroke-width=".45">
+<rect x="2" y="2" width="64" height="106" rx=".4"/><line x1="2" y1="55" x2="66" y2="55"/><circle cx="34" cy="55" r="8"/><circle cx="34" cy="55" r=".7" fill="rgba(255,255,255,.85)"/>
+<path d="M17 2 A17 15 0 0 0 51 2"/><circle cx="34" cy="13" r=".6" fill="rgba(255,255,255,.85)"/><circle cx="34" cy="21" r=".6" fill="rgba(255,255,255,.85)"/>
+<path d="M17 108 A17 15 0 0 1 51 108"/><circle cx="34" cy="97" r=".6" fill="rgba(255,255,255,.85)"/><circle cx="34" cy="89" r=".6" fill="rgba(255,255,255,.85)"/>
+<rect x="29.5" y=".3" width="9" height="1.7" stroke-width=".35"/><rect x="29.5" y="108" width="9" height="1.7" stroke-width=".35"/></svg>`;
+
+function shirtStyle(j, t, slotPos){
+  const T = S.times[t>=0?t:0];
+  if(t<0) return `background:#475569;color:#fff`;
+  const gk = (j ? j.pos : slotPos)==='GOL' || slotPos==='GOL';
+  const bg = gk ? T.gk : T.cor;
+  return `background:${bg};color:${contrast(bg)}`;
+}
+function tokHTML(t, e, i, opts){
+  const sl = slotsFor(t)[i]; const j = e.pid && J(e.pid);
+  opts = opts||{};
+  if(!j) return `<div class="tok" data-t="${t}" data-i="${i}" style="left:${e.x}%;top:${e.y}%"><div class="shirt empty" style="border-color:${S.times[t].cor}">+</div><div class="tname empty">${sl.pos}</div></div>`;
+  const g = (opts.gols!==false && j.gols>0) ? `<span class="gbadge">⚽${j.gols}</span>` : '';
+  const p = opts.pos!==false ? `<span class="pdot" style="background:${posCol(j.pos)}">${j.pos}</span>` : '';
+  return `<div class="tok" data-t="${t}" data-i="${i}" style="left:${e.x}%;top:${e.y}%"><div class="shirt" style="${shirtStyle(j,t,sl.pos)}">${esc(j.num||'')}${g}${p}</div><div class="tname">${esc(short(j.nome))}</div></div>`;
+}
+function pitchHTML(opts){
+  return `<div class="pitch" id="${opts?'':'pitch'}">${SVG_FIELD}
+    <div class="tlabel top" style="background:${S.times[1].cor};color:${contrast(S.times[1].cor)}">${esc(S.times[1].nome)}</div>
+    <div class="tlabel bot" style="background:${S.times[0].cor};color:${contrast(S.times[0].cor)}">${esc(S.times[0].nome)}</div>
+    ${[0,1].map(t=>S.times[t].esc.map((e,i)=>tokHTML(t,e,i,opts)).join('')).join('')}</div>`;
+}
+function rCampo(){
+  const banco = S.banco.map(J).filter(Boolean);
+  const livres = S.jog.filter(j=>!onField(j.id) && !S.banco.includes(j.id));
+  main.innerHTML = `
+  <div class="chips">${[0,1].map(t=>`<button class="chip ${t===selT?'on':''}" onclick="selT=${t};rCampo()"><span class="dot" style="background:${S.times[t].cor}"></span>${esc(S.times[t].nome)}</button>`).join('')}
+    <span style="color:var(--mut);font-size:12.5px;align-self:center;margin-left:4px">formação de linha:</span></div>
+  <div class="chips" style="padding-top:0">${Object.keys(FORM).map(f=>`<button class="chip ${f===S.times[selT].form?'on':''}" onclick="setForm('${f}')">${f}</button>`).join('')}</div>
+  ${pitchHTML()}
+  <div class="hint">Toque no jogador para editar · arraste para mudar a posição</div>
+  <div class="row" style="gap:6px">
+    <button class="btn sm" style="flex:1.2" onclick="sortear()">🎲 Sortear times</button>
+    <button class="btn sec sm" style="flex:1" onclick="autoEscalar()">✨ Completar</button>
+    <button class="btn sec sm" style="flex:.8" onclick="resetPos()">↺</button>
+    <button class="btn sec sm" style="flex:.8" onclick="limparCampo()">🧹</button>
+  </div>
+  <div class="ttl">Reservas / próximos (${banco.length})</div>
+  <div class="bench">${banco.map(j=>`<div class="b" onclick="benchSheet('${j.id}')"><div class="shirt" style="${shirtStyle(j,-1)}">${esc(j.num||'')}</div><div class="tname">${esc(short(j.nome))}</div></div>`).join('')}
+    <div class="b" onclick="addBancoSheet()"><div class="shirt empty">+</div><div class="tname empty">Adicionar</div></div></div>
+  ${livres.length?`<div class="hint">${livres.length} jogador(es) do elenco fora da lista</div>`:''}`;
+  bindDrag();
+}
+function setForm(f){
+  const T = S.times[selT]; T.form = f; const sl = slotsFor(selT);
+  T.esc.forEach((e,i)=>{ e.x=sl[i].x; e.y=sl[i].y; }); save(); render();
+}
+function resetPos(){ [0,1].forEach(t=>{ const sl=slotsFor(t); S.times[t].esc.forEach((e,i)=>{ e.x=sl[i].x; e.y=sl[i].y; }); }); save(); render(); toast('Posições restauradas'); }
+function limparCampo(){
+  ask('Tirar todos da quadra e mandar para as reservas?', ()=>{
+    [0,1].forEach(t=>S.times[t].esc.forEach(e=>{ if(e.pid && !S.banco.includes(e.pid)) S.banco.push(e.pid); e.pid=null; }));
+    save(); closeSheet(); render(); toast('Quadra limpa'); }, 'Limpar');
+}
+function autoEscalar(){ fillAuto(); save(); render(); toast('Vagas completadas'); }
+/* preenche vagas vazias alternando os times, respeitando posição */
+function fillAuto(restrict){
+  const used = new Set(); [0,1].forEach(t=>S.times[t].esc.forEach(e=>{ if(e.pid) used.add(e.pid); }));
+  const pool = t => S.jog.filter(j=>!used.has(j.id) && (!restrict || restrict[j.id]===undefined || restrict[j.id]===t));
+  const tests = [ (j,p)=>j.pos===p, (j,p)=>p!=='GOL' && j.pos!=='GOL' && POS[j.pos].g===POS[p].g, (j,p)=>p!=='GOL' ? j.pos!=='GOL' : true, ()=>true ];
+  tests.forEach(test=>{
+    const n = 1 + LINHA;
+    for(let i=0;i<n;i++) for(const t of [0,1]){
+      const e = S.times[t].esc[i]; if(e.pid) continue;
+      const p = slotsFor(t)[i].pos;
+      const c = pool(t).sort((a,b)=>b.gols-a.gols).find(j=>test(j,p));
+      if(c){ e.pid=c.id; used.add(c.id); }
+    }
+  });
+  S.banco = S.banco.filter(id=>!used.has(id));
+}
+/* sorteio equilibrado: 1 goleiro em cada time, linha em "zigue-zague" pelos gols com um pouco de sorte */
+function sortear(){
+  const all = [...S.jog]; if(all.length < 2){ toast('Cadastre jogadores no elenco primeiro'); return; }
+  const shuffle = a => { for(let i=a.length-1;i>0;i--){ const k=Math.floor(Math.random()*(i+1)); [a[i],a[k]]=[a[k],a[i]]; } return a; };
+  const gks = shuffle(all.filter(j=>j.pos==='GOL'));
+  const linha = shuffle(all.filter(j=>j.pos!=='GOL')).sort((a,b)=>(b.gols+Math.random()*3)-(a.gols+Math.random()*3));
+  const team = {}; const cnt=[0,0];
+  gks.slice(0,2).forEach((g,i)=>{ team[g.id]=i; });
+  let k=0;
+  for(const j of linha){
+    if(cnt[0]>=LINHA && cnt[1]>=LINHA) break;
+    let t = [0,1,1,0][k%4]; if(cnt[t]>=LINHA) t=1-t;
+    team[j.id]=t; cnt[t]++; k++;
+  }
+  [0,1].forEach(t=>S.times[t].esc.forEach(e=>e.pid=null));
+  // goleiros
+  gks.slice(0,2).forEach((g,i)=>{ S.times[i].esc[0].pid=g.id; });
+  fillAuto(team);
+  // quem ficou sem vaga vai para reservas
+  S.banco = S.jog.filter(j=>!onField(j.id)).map(j=>j.id);
+  resetPos(); toast('🎲 Times sorteados!');
+}
+
+/* arrastar */
+function bindDrag(){
+  const pitch = document.getElementById('pitch'); if(!pitch) return;
+  pitch.querySelectorAll('.tok').forEach(el=>{
+    let sx, sy, moved=false, rect, id=null;
+    el.addEventListener('pointerdown', ev=>{
+      id=ev.pointerId; sx=ev.clientX; sy=ev.clientY; moved=false; rect=pitch.getBoundingClientRect();
+      try{ el.setPointerCapture(id); }catch(e){}
+    });
+    el.addEventListener('pointermove', ev=>{
+      if(id!==ev.pointerId) return;
+      if(!moved && Math.hypot(ev.clientX-sx, ev.clientY-sy) > 7){ moved=true; el.classList.add('drag'); }
+      if(moved){
+        const x = Math.min(95, Math.max(5, (ev.clientX-rect.left)/rect.width*100));
+        const y = Math.min(96, Math.max(4, (ev.clientY-rect.top)/rect.height*100));
+        el.style.left=x+'%'; el.style.top=y+'%'; el._x=x; el._y=y;
+      }
+    });
+    const up = ev=>{
+      if(id!==ev.pointerId) return; id=null; el.classList.remove('drag');
+      const t = +el.dataset.t, i = +el.dataset.i;
+      if(moved){ if(el._x!=null){ S.times[t].esc[i].x=+el._x.toFixed(1); S.times[t].esc[i].y=+el._y.toFixed(1); save(); } }
+      else if(ev.type==='pointerup') slotSheet(t,i);
+    };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+}
+
+/* ---- sheets do campo ---- */
+function slotSheet(t,i){
+  const e = S.times[t].esc[i], j = e.pid && J(e.pid);
+  if(!j) return pickSheet(t,i);
+  openSheet(playerForm(j, {slot:i, team:t}));
+}
+function statusTxt(id){ const t=teamOf(id); return t>=0 ? 'No '+S.times[t].nome+' (troca de lugar)' : S.banco.includes(id) ? 'Reserva' : 'Fora da lista'; }
+function pickSheet(t, i, swap){
+  const sl = slotsFor(t)[i];
+  const cur = S.times[t].esc[i].pid;
+  const g = POS[sl.pos].g;
+  const rank = j => (j.pos===sl.pos?0:POS[j.pos].g===g?1:2) + (onField(j.id)?3:0);
+  const list = S.jog.filter(j=>j.id!==cur).sort((a,b)=>rank(a)-rank(b) || (a.num||99)-(b.num||99));
+  openSheet(`<div class="sh-h">${shield(t)}<h2>${swap?'Trocar':'Escolher'} · ${sl.pos}</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+   <button class="btn full" onclick="newPlayerSheet(${t},${i})">＋ Cadastrar novo jogador</button>
+   <div class="pick">${list.length? list.map(j=>{ const tt=teamOf(j.id); return `<div class="pl" onclick="putSlot(${t},${i},'${j.id}')">
+      <div class="num" style="${shirtStyle(j,tt)}">${esc(j.num||'')}</div>
+      <div class="info"><div class="nm">${esc(j.nome)}</div><div class="sub"><span class="tag" style="background:${posCol(j.pos)}">${j.pos}</span>${statusTxt(j.id)}</div></div>
+      <div class="stat"><b>${j.gols}</b><span>gols</span></div></div>`; }).join('') : '<div class="empty-st">Nenhum jogador no elenco ainda</div>'}</div>`);
+}
+function putSlot(t, i, pid){
+  const ft = teamOf(pid); const fi = ft>=0 ? S.times[ft].esc.findIndex(e=>e.pid===pid) : -1;
+  const prev = S.times[t].esc[i].pid;
+  if(ft>=0){ S.times[ft].esc[fi].pid = prev; }
+  else if(prev && !S.banco.includes(prev)) S.banco.push(prev);
+  S.times[t].esc[i].pid = pid; S.banco = S.banco.filter(id=>id!==pid && !onField(id));
+  save(); closeSheet(); render();
+}
+function toBench(t,i){
+  const pid = S.times[t].esc[i].pid; S.times[t].esc[i].pid=null; if(pid && !S.banco.includes(pid)) S.banco.push(pid);
+  save(); closeSheet(); render(); toast('Foi para as reservas');
+}
+function benchSheet(pid){ const j=J(pid); if(j) openSheet(playerForm(j,{bench:true})); }
+function addBancoSheet(){
+  const list = S.jog.filter(j=>!onField(j.id) && !S.banco.includes(j.id));
+  openSheet(`<div class="sh-h"><h2>Adicionar às reservas</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+   <button class="btn full" onclick="newPlayerSheet(-1,-1)">＋ Cadastrar novo jogador</button>
+   <div class="pick">${list.length? list.map(j=>`<div class="pl" onclick="S.banco.push('${j.id}');save();closeSheet();render()">
+     <div class="num" style="${shirtStyle(j,-1)}">${esc(j.num||'')}</div><div class="info"><div class="nm">${esc(j.nome)}</div><div class="sub"><span class="tag" style="background:${posCol(j.pos)}">${j.pos}</span>${POS[j.pos].n}</div></div><div class="stat"><b>${j.gols}</b><span>gols</span></div></div>`).join('')
+     : '<div class="empty-st">Todo o elenco já está na quadra ou nas reservas</div>'}</div>`);
+}
+function benchToField(pid){
+  const j = J(pid);
+  const opts = [];
+  [0,1].forEach(t=>{ const sl=slotsFor(t); S.times[t].esc.forEach((e,k)=>opts.push({t,k,e,pos:sl[k].pos})); });
+  opts.sort((a,b)=>(!!a.e.pid - !!b.e.pid) || ((a.pos===j.pos?0:1)-(b.pos===j.pos?0:1)));
+  openSheet(`<div class="sh-h"><h2>${esc(short(j.nome))} entra onde?</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <div class="pick">${opts.map(o=>{ const p=o.e.pid&&J(o.e.pid); return `<div class="pl" onclick="putSlot(${o.t},${o.k},'${pid}');toast('${p?'Substituição feita':'Entrou na quadra'}')">
+    <div class="num" style="${shirtStyle(p,o.t,o.pos)}">${p?esc(p.num||''):'+'}</div>
+    <div class="info"><div class="nm">${p?'No lugar de '+esc(p.nome):'Vaga livre'}</div><div class="sub"><span class="tag" style="background:${S.times[o.t].cor};color:${contrast(S.times[o.t].cor)}">${esc(S.times[o.t].nome)}</span>${o.pos}</div></div><b>${p?'⇄':'＋'}</b></div>`; }).join('')}</div>`);
+}
+
+/* ---- formulário de jogador ---- */
+let F = null;
+function playerForm(j, ctx){
+  F = {id:j?j.id:null, nome:j?j.nome:'', num:j?j.num:'', pos:j?j.pos:(ctx&&ctx.pos)||'ALA', gols:j?j.gols:0, assist:j?j.assist:0, jogos:j?j.jogos:0, ctx:ctx||{}};
+  const c = F.ctx;
+  let acts = '';
+  if(j && c.slot!=null && c.team!=null) acts = `<button class="btn sec" onclick="pickSheet(${c.team},${c.slot},true)">⇄ Trocar</button><button class="btn sec" onclick="toBench(${c.team},${c.slot})">🪑 Pra reserva</button>`;
+  else if(j && c.bench) acts = `<button class="btn sec" onclick="benchToField('${j.id}')">🏟️ Pôr na quadra</button><button class="btn sec" onclick="S.banco=S.banco.filter(x=>x!=='${j.id}');save();closeSheet();render()">✕ Tirar da lista</button>`;
+  const t = j ? teamOf(j.id) : (c.team!=null ? c.team : -1);
+  return `<div class="sh-h"><div class="num" id="fNumBall" style="background:${posCol(F.pos)}">${esc(F.num||'')}</div><h2>${j?'Editar jogador':'Novo jogador'}${t>=0?`<small style="display:block;font-size:12px;color:var(--mut);font-weight:600">${esc(S.times[t].nome)}</small>`:''}</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <div class="grid2" style="grid-template-columns:1fr 92px">
+    <div><label class="f">Nome</label><input class="inp" id="fNome" value="${esc(F.nome)}" placeholder="Nome do jogador" maxlength="28"></div>
+    <div><label class="f">Número</label><input class="inp" id="fNum" type="number" inputmode="numeric" value="${esc(F.num)}" placeholder="10" oninput="document.getElementById('fNumBall').textContent=this.value"></div>
+  </div>
+  <label class="f">Posição: <b id="fPosN" style="color:var(--txt)">${POS[F.pos].n}</b></label>
+  <div class="posgrid">${POS_KEYS.map(p=>`<button data-p="${p}" class="${p===F.pos?'on':''}" style="${p===F.pos?'background:'+posCol(p):''}" onclick="fPos('${p}')">${p}</button>`).join('')}</div>
+  <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;gap:8px">
+    ${['gols','assist','jogos'].map(k=>`<div><label class="f">${k==='gols'?'⚽ Gols':k==='assist'?'🅰️ Assist.':'🏟️ Jogos'}</label>
+      <div class="step"><button onclick="fStep('${k}',-1)">−</button><b id="f_${k}">${F[k]}</b><button onclick="fStep('${k}',1)">+</button></div></div>`).join('')}
+  </div>
+  <button class="btn full" style="margin-top:16px" onclick="fSave()">💾 Salvar</button>
+  ${acts?`<div class="acts">${acts}</div>`:''}
+  ${j?`<button class="btn red full" style="margin-top:8px" onclick="delPlayer('${j.id}')">🗑️ Excluir do elenco</button>`:''}`;
+}
+function fPos(p){
+  F.pos=p; document.querySelectorAll('.posgrid button').forEach(b=>{ const on=b.dataset.p===p; b.classList.toggle('on',on); b.style.background=on?posCol(p):''; });
+  document.getElementById('fPosN').textContent=POS[p].n; document.getElementById('fNumBall').style.background=posCol(p);
+}
+function fStep(k,d){ F[k]=Math.max(0,(+F[k]||0)+d); document.getElementById('f_'+k).textContent=F[k]; }
+function fSave(){
+  const nome = document.getElementById('fNome').value.trim();
+  if(!nome){ toast('Digite o nome do jogador'); document.getElementById('fNome').focus(); return; }
+  const num = document.getElementById('fNum').value.trim();
+  const data = {nome, num: num===''?'':Math.max(0,Math.min(999,parseInt(num)||0)), pos:F.pos, gols:F.gols, assist:F.assist, jogos:F.jogos};
+  if(F.id){ Object.assign(J(F.id),data); }
+  else {
+    const j=Object.assign({id:uid()},data); S.jog.push(j);
+    const c=F.ctx;
+    if(c.team!=null && c.team>=0 && c.slot>=0){ const e=S.times[c.team].esc[c.slot]; if(e.pid && !S.banco.includes(e.pid)) S.banco.push(e.pid); e.pid=j.id; }
+    else if(c.team===-1) S.banco.push(j.id);
+  }
+  save(); closeSheet(); render(); toast(F.id?'Jogador atualizado':'Jogador cadastrado');
+}
+function newPlayerSheet(t,i){
+  const pos = t>=0 ? slotsFor(t)[i].pos : 'ALA';
+  sheet.innerHTML = '<div class="grab"></div>' + playerForm(null,{team:t, slot:i, pos});
+  setTimeout(()=>{ const n=document.getElementById('fNome'); n&&n.focus(); },250);
+}
+function delPlayer(id){
+  const j=J(id); ask('Excluir '+j.nome+' do elenco? Os gols dele saem da artilharia.', ()=>{
+    S.jog=S.jog.filter(x=>x.id!==id); S.times.forEach(T=>T.esc.forEach(e=>{ if(e.pid===id) e.pid=null; })); S.banco=S.banco.filter(x=>x!==id);
+    S.partidas.forEach(p=>p.marc=p.marc.filter(m=>m.pid!==id));
+    save(); closeSheet(); render(); toast('Jogador excluído'); }, 'Excluir');
+}
+
+/* ================== ELENCO ================== */
+let fltPos='todos', q='';
+function rElenco(){
+  main.innerHTML = `
+  <div style="height:8px"></div>
+  <input class="search" placeholder="🔎 Buscar por nome ou número" value="${esc(q)}" oninput="q=this.value;rElencoList()">
+  <div class="chips">${['todos',0,1,2,3].map(g=>`<button class="chip ${String(g)===String(fltPos)?'on':''}" onclick="fltPos='${g}';rElenco()">${g==='todos'?'Todos ('+S.jog.length+')':GNAME[g]}</button>`).join('')}</div>
+  <div id="elist"></div>
+  <button class="btn fab" onclick="openSheet(playerForm(null,{}))">＋ Jogador</button>`;
+  rElencoList();
+}
+function rElencoList(){
+  const el=document.getElementById('elist'); if(!el) return;
+  const list = S.jog.filter(j=>(fltPos==='todos'||POS[j.pos].g==+fltPos) && (!q || j.nome.toLowerCase().includes(q.toLowerCase()) || String(j.num)===q.trim()));
+  list.sort((a,b)=>POS[a.pos].g-POS[b.pos].g || (a.num||999)-(b.num||999));
+  el.innerHTML = list.length ? list.map(j=>{ const t=teamOf(j.id); return `<div class="pl">
+    <div class="num" style="background:${posCol(j.pos)}" onclick="editP('${j.id}')">${esc(j.num||'–')}</div>
+    <div class="info" onclick="editP('${j.id}')"><div class="nm">${esc(j.nome)}</div>
+      <div class="sub"><span class="tag" style="background:${posCol(j.pos)}">${j.pos}</span>${POS[j.pos].n}${t>=0?` · <span style="color:${S.times[t].cor==='#111827'?'#cbd5e1':S.times[t].cor};font-weight:700">${esc(S.times[t].nome)}</span>`:S.banco.includes(j.id)?' · 🪑 reserva':''}</div></div>
+    <div class="stat"><b>${j.gols}</b><span>gols</span></div>
+    <button class="plus" onclick="quickGol('${j.id}')">⚽+</button></div>`; }).join('')
+    : `<div class="empty-st"><b>👥</b>Nenhum jogador encontrado</div>`;
+}
+function editP(id){ openSheet(playerForm(J(id),{})); }
+function quickGol(id){ const j=J(id); j.gols++; save(); rElencoList(); toast('⚽ Gol de '+j.nome+'! Total: '+j.gols); }
+
+/* ================== GOLS / ARTILHARIA ================== */
+function rGols(){
+  const rank = [...S.jog].sort((a,b)=>b.gols-a.gols || b.assist-a.assist).filter(j=>j.gols>0 || j.assist>0);
+  const tot = S.jog.reduce((s,j)=>s+j.gols,0);
+  const pts = S.partidas.length;
+  const max = rank.length ? rank[0].gols||1 : 1;
+  main.innerHTML = `
+  <div class="kpis">
+    <div class="kpi"><b>${tot}</b><span>gols do elenco</span></div>
+    <div class="kpi"><b>${pts}</b><span>partidas</span></div>
+    <div class="kpi"><b>${pts?(S.partidas.reduce((s,p)=>s+p.ga+p.gb,0)/pts).toFixed(1):'–'}</b><span>gols/jogo</span></div>
+  </div>
+  <button class="btn full" style="margin-top:10px" onclick="matchSheet()">＋ Registrar partida e gols</button>
+  <div class="ttl">🏆 Artilharia</div>
+  <div class="card" style="padding:4px 10px">${rank.length ? rank.map((j,i)=>`<div class="rk" onclick="editP('${j.id}')">
+      <div class="pos ${i<3?'m'+(i+1):''}">${i<3?['🥇','🥈','🥉'][i]:i+1+'º'}</div>
+      <div class="num" style="background:${posCol(j.pos)};width:34px;height:34px;font-size:13px">${esc(j.num||'')}</div>
+      <div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between"><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.nome)}</b><b>${j.gols} ⚽</b></div>
+        <div class="bar"><i style="width:${Math.max(3,j.gols/max*100)}%"></i></div>
+        <div class="sub" style="color:var(--mut);font-size:11.5px;margin-top:3px">${j.pos} · ${j.assist} assist. · ${j.jogos} jogos${j.jogos?' · média '+(j.gols/j.jogos).toFixed(2):''}</div></div></div>`).join('')
+    : '<div class="empty-st"><b>⚽</b>Nenhum gol registrado ainda</div>'}</div>
+  <div class="ttl">📋 Partidas</div>
+  ${pts ? [...S.partidas].reverse().map(p=>{
+    const mk = p.marc.filter(m=>m.g>0).map(m=>{const j=J(m.pid); return j? esc(short(j.nome))+(m.g>1?' ('+m.g+')':''):''}).filter(Boolean).join(', ');
+    return `<div class="card" onclick="matchView('${p.id}')"><div class="match">
+      <div style="flex:1;text-align:right;font-weight:${p.ga>p.gb?800:500};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.na)}</div>
+      <div class="score ${p.ga===p.gb?'e':'v'}">${p.ga} x ${p.gb}</div>
+      <div style="flex:1;font-weight:${p.gb>p.ga?800:500};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.nb)}</div></div>
+      <div class="sub" style="color:var(--mut);font-size:12px;margin-top:6px;text-align:center">${fmtData(p.data)}${mk?' · ⚽ '+mk:''}</div></div>`; }).join('')
+   : '<div class="hint">Registre os jogos para os gols entrarem automaticamente na artilharia.</div>'}`;
+}
+function fmtData(d){ if(!d) return ''; const [y,m,dd]=d.split('-'); return dd+'/'+m+'/'+y; }
+let M=null;
+function matchSheet(){
+  const d = new Date(); const iso = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  M = {ga:0, gb:0, marc:{}};
+  const grupo = (t) => { const ids = t>=0 ? S.times[t].esc.map(e=>e.pid).filter(Boolean) : S.jog.filter(j=>!onField(j.id)).map(j=>j.id); return ids.map(J).filter(Boolean); };
+  const linha = j => `<div class="pl" style="padding:6px 8px;margin:6px 0"><div class="num" style="background:${posCol(j.pos)};width:32px;height:32px;font-size:12px">${esc(j.num||'')}</div>
+     <div class="info"><div class="nm" style="font-size:14px">${esc(j.nome)}</div><div class="sub" style="font-size:11px">${j.pos}</div></div>
+     <div class="step" style="width:120px"><button style="width:36px;height:34px" onclick="mGol('${j.id}',-1)">−</button><b id="mg_${j.id}" style="font-size:15px">0</b><button style="width:36px;height:34px" onclick="mGol('${j.id}',1)">+</button></div></div>`;
+  const sec = (titulo, cor, list) => list.length ? `<div class="ttl" style="margin-top:10px">${cor?`<span class="dot" style="background:${cor}"></span>`:''}${titulo}</div>${list.map(linha).join('')}` : '';
+  openSheet(`<div class="sh-h"><h2>Registrar partida</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <label class="f">Data</label><input class="inp" id="mData" type="date" value="${iso}">
+  <div class="grid2"><div><label class="f">${esc(S.times[0].nome)}</label><div class="step"><button onclick="mStep('ga',-1)">−</button><b id="m_ga">0</b><button onclick="mStep('ga',1)">+</button></div></div>
+  <div><label class="f">${esc(S.times[1].nome)}</label><div class="step"><button onclick="mStep('gb',-1)">−</button><b id="m_gb">0</b><button onclick="mStep('gb',1)">+</button></div></div></div>
+  <label class="f">Quem marcou? <span id="mSum" style="color:var(--warn)"></span></label>
+  <div class="pick" style="max-height:38vh">${sec(S.times[0].nome, S.times[0].cor, grupo(0))}${sec(S.times[1].nome, S.times[1].cor, grupo(1))}${sec('Outros do elenco', '', grupo(-1))}</div>
+  <div class="tgl"><span>Somar +1 jogo para quem está na quadra</span><input type="checkbox" id="mContar" checked></div>
+  <button class="btn full" style="margin-top:14px" onclick="mSave()">💾 Salvar partida</button>`);
+}
+function mStep(k,d){ M[k]=Math.max(0,M[k]+d); document.getElementById('m_'+k).textContent=M[k]; }
+function mGol(id,d){
+  const old = M.marc[id]||0; M.marc[id]=Math.max(0,old+d); document.getElementById('mg_'+id).textContent=M.marc[id];
+  const diff = M.marc[id]-old, t = teamOf(id);
+  if(diff && t>=0){ const k = t===0?'ga':'gb'; M[k]=Math.max(0,M[k]+diff); document.getElementById('m_'+k).textContent=M[k]; }
+}
+function mSave(){
+  const p = {id:uid(), data:document.getElementById('mData').value, na:S.times[0].nome, nb:S.times[1].nome, ga:M.ga, gb:M.gb,
+    marc:Object.entries(M.marc).filter(([k,v])=>v>0).map(([pid,g])=>({pid,g})), jogos:[]};
+  p.marc.forEach(m=>{ const j=J(m.pid); if(j) j.gols+=m.g; });
+  if(document.getElementById('mContar').checked){ S.times.forEach(T=>T.esc.forEach(e=>{ if(e.pid){ const j=J(e.pid); if(j){ j.jogos++; p.jogos.push(e.pid);} } })); }
+  S.partidas.push(p); save(); closeSheet(); render(); toast('Partida salva · gols somados na artilharia');
+}
+function matchView(id){
+  const p=S.partidas.find(x=>x.id===id); if(!p) return;
+  openSheet(`<div class="sh-h"><h2>${esc(p.na)} x ${esc(p.nb)}</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <div class="card" style="text-align:center"><div style="font-size:34px;font-weight:800">${p.ga} x ${p.gb}</div><div class="sub" style="color:var(--mut)">${fmtData(p.data)}</div></div>
+  <div class="ttl">Gols</div>${p.marc.length?p.marc.map(m=>{const j=J(m.pid);return j?`<div class="pl"><div class="num" style="background:${posCol(j.pos)}">${esc(j.num||'')}</div><div class="info"><div class="nm">${esc(j.nome)}</div></div><b>${'⚽'.repeat(Math.min(m.g,6))}${m.g>6?' '+m.g:''}</b></div>`:''}).join(''):'<div class="hint">Sem marcadores registrados</div>'}
+  <button class="btn red full" style="margin-top:14px" onclick="delMatch('${p.id}')">🗑️ Excluir partida (desfaz os gols)</button>`);
+}
+function delMatch(id){
+  const p=S.partidas.find(x=>x.id===id); ask('Excluir esta partida? Os gols dela serão descontados da artilharia.', ()=>{
+    p.marc.forEach(m=>{ const j=J(m.pid); if(j) j.gols=Math.max(0,j.gols-m.g); });
+    (p.jogos||[]).forEach(pid=>{ const j=J(pid); if(j) j.jogos=Math.max(0,j.jogos-1); });
+    S.partidas=S.partidas.filter(x=>x.id!==id); save(); closeSheet(); render(); toast('Partida excluída'); }, 'Excluir');
+}
+
+/* ================== PRÉVIA ================== */
+function rPrevia(){
+  const o = S.pv;
+  const top = [...S.jog].filter(j=>j.gols>0).sort((a,b)=>b.gols-a.gols).slice(0,3);
+  const banco = S.banco.map(J).filter(Boolean);
+  const d = new Date();
+  main.innerHTML = `
+  <div class="chips">
+    <button class="chip ${o.gols?'on':''}" onclick="S.pv.gols=!S.pv.gols;save();render()">⚽ Gols</button>
+    <button class="chip ${o.pos?'on':''}" onclick="S.pv.pos=!S.pv.pos;save();render()">🏷️ Posições</button>
+    <button class="chip ${o.banco?'on':''}" onclick="S.pv.banco=!S.pv.banco;save();render()">🪑 Reservas</button>
+  </div>
+  <div class="pv" id="pv">
+    <div class="pv-h" style="justify-content:center;text-align:center">
+      ${shield(0)}<div><h2>${esc(S.times[0].nome)} <span style="color:var(--mut)">x</span> ${esc(S.times[1].nome)}</h2><p>Futsal · 6 x 6 · ${d.toLocaleDateString('pt-BR')}</p></div>${shield(1)}</div>
+    ${pitchHTML({gols:o.gols,pos:o.pos})}
+    <div class="pv-foot" style="${(!o.banco && !o.gols)?'display:none':''}">
+      ${o.gols?`<div class="pv-box"><h4>🏆 Artilheiros</h4>${top.length?top.map((j,i)=>`<div>${['🥇','🥈','🥉'][i]} ${esc(short(j.nome))} · <b>${j.gols}</b></div>`).join(''):'<div style="color:var(--mut)">—</div>'}</div>`:''}
+      ${o.banco?`<div class="pv-box" style="${!o.gols?'grid-column:1/-1':''}"><h4>🪑 Reservas</h4>${banco.length?banco.map(j=>`<div>${esc(j.num||'')} · ${esc(short(j.nome))} <span style="color:var(--mut)">${j.pos}</span></div>`).join(''):'<div style="color:var(--mut)">—</div>'}</div>`:''}
+    </div>
+    <div class="brand">JA Escalação · por Jadilson Alves</div>
+  </div>
+  <div class="hint">📸 Tire um print desta tela para mandar no grupo</div>`;
+}
+
+/* ================== CONFIG ================== */
+function openConfig(){
+  const bloco = t => { const T=S.times[t]; return `<div class="card">
+    <div class="row">${shield(t)}<input class="inp" value="${esc(T.nome)}" maxlength="20" oninput="S.times[${t}].nome=this.value||'Time ${t?'B':'A'}';save();header()"></div>
+    <label class="f">Cor do colete / camisa</label><div class="sw">${COLORS.map(c=>`<button style="background:${c}" class="${c===T.cor?'on':''}" onclick="setCor(${t},'cor','${c}',this)"></button>`).join('')}</div>
+    <label class="f">Camisa do goleiro</label><div class="sw">${GKCOLORS.map(c=>`<button style="background:${c}" class="${c===T.gk?'on':''}" onclick="setCor(${t},'gk','${c}',this)"></button>`).join('')}</div></div>`; };
+  openSheet(`<div class="sh-h"><h2>⚙️ Times</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  ${bloco(0)}${bloco(1)}
+  <div class="ttl">Backup</div>
+  <div class="acts" style="margin-top:0"><button class="btn sec" onclick="exportar()">📤 Copiar backup</button><button class="btn sec" onclick="importar()">📥 Restaurar</button></div>
+  <div class="ttl">Zerar</div>
+  <div class="acts" style="margin-top:0"><button class="btn sec" onclick="zerarGols()">0️⃣ Zerar gols</button><button class="btn red" onclick="apagarTudo()">🗑️ Apagar tudo</button></div>
+  <div class="brand" style="margin-top:16px">JA Escalação v1.1 · Futsal 6x6 · por Jadilson Alves</div>`);
+}
+function setCor(t,k,c,el){ S.times[t][k]=c; save(); el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on')); el.classList.add('on');
+  const sh = el.closest('.card').querySelector('.shield'); if(sh && k==='cor'){ sh.style.background=c; sh.style.color=contrast(c); } render(); }
+function exportar(){
+  openSheet(`<div class="sh-h"><h2>📤 Backup</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <div class="hint" style="text-align:left">Copie o texto abaixo e guarde (ex.: mande para você no WhatsApp). Para restaurar, cole em “Restaurar”.</div>
+  <textarea class="inp" id="bk" rows="8" readonly>${esc(JSON.stringify(S))}</textarea>
+  <button class="btn full" style="margin-top:10px" onclick="copiar()">📋 Copiar</button>`);
+}
+function copiar(){
+  const t=document.getElementById('bk'); t.removeAttribute('readonly'); t.focus(); t.select(); t.setSelectionRange(0, t.value.length);
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  if(!ok && navigator.clipboard){ navigator.clipboard.writeText(t.value).then(()=>toast('Backup copiado!')).catch(()=>toast('Segure no texto e escolha Copiar')); return; }
+  toast(ok?'Backup copiado!':'Segure no texto e escolha Copiar');
+}
+function importar(){
+  openSheet(`<div class="sh-h"><h2>📥 Restaurar backup</h2><button class="ib" onclick="closeSheet()">✕</button></div>
+  <div class="hint" style="text-align:left">Cole aqui o texto do backup. Os dados atuais serão substituídos.</div>
+  <textarea class="inp" id="bk" rows="8" placeholder='{"times":...}'></textarea>
+  <button class="btn full" style="margin-top:10px" onclick="restaurar()">Restaurar</button>`);
+}
+function restaurar(){
+  try{ const o=JSON.parse(document.getElementById('bk').value); if(!o.jog) throw 0; S = o.times ? o : migrate(o); fixEsc(); save(); closeSheet(); render(); toast('Backup restaurado!'); }
+  catch(e){ toast('Texto de backup inválido'); }
+}
+function zerarGols(){ ask('Zerar gols, assistências e jogos de todos? As partidas também serão apagadas.', ()=>{ S.jog.forEach(j=>{j.gols=0;j.assist=0;j.jogos=0;}); S.partidas=[]; save(); closeSheet(); render(); toast('Estatísticas zeradas'); }, 'Zerar'); }
+function apagarTudo(){ ask('Apagar o elenco inteiro e começar do zero?', ()=>{
+  const nt = base(); nt.times.forEach((T,i)=>{ T.nome=S.times[i].nome; T.cor=S.times[i].cor; T.gk=S.times[i].gk; T.form=S.times[i].form; });
+  nt.pv = S.pv; S = nt; resetSlots(); fixEsc(); save(); closeSheet(); go('elenco'); toast('Tudo apagado'); }, 'Apagar'); }
+
+/* ================== INÍCIO ================== */
+load(); render();
+</script>
+</body>
+</html>
